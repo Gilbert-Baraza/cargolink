@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "714902726074",
+    "project_id": "cargolink-fe985",
+    "storage_bucket": "cargolink-fe985.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:714902726074:android:5db61751b3c588fdf6e983",
+        "android_client_info": {
+          "package_name": "com.example.cargolink"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1jpasnDKWW6doHJSs-zbZ0jiFNwMq900"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
