@@ -140,18 +140,18 @@ fun ProfileScreen(
                             )
                         )
                         Spacer(modifier = Modifier.height(12.dp))
-                        OutlinedTextField(
-                            value = participationType,
-                            onValueChange = { participationType = it },
-                            label = { Text("Role (TRUCK_OPERATOR / CARGO_OWNER)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                focusedLabelColor = MaterialTheme.colorScheme.primary,
-                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                focusedTextColor = MaterialTheme.colorScheme.onSurface
+                            OutlinedTextField(
+                                value = participationType,
+                                onValueChange = { participationType = it },
+                                label = { Text("Role (TRUCK_DRIVER / CARGO_OWNER)") },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface
+                                )
                             )
-                        )
 
                         Spacer(modifier = Modifier.height(24.dp))
 

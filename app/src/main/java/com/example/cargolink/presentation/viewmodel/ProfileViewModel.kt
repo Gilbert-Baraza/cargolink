@@ -19,7 +19,7 @@ sealed class ProfileState {
 
 class ProfileViewModel : ViewModel() {
     private val userRepository = UserRepository()
-    private val auth = FirebaseAuth.getInstance()
+    private val auth by lazy { FirebaseAuth.getInstance() }
 
     private val _profileState = MutableStateFlow<ProfileState>(ProfileState.Loading)
     val profileState: StateFlow<ProfileState> = _profileState.asStateFlow()

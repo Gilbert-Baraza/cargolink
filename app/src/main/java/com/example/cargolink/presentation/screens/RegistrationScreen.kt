@@ -24,13 +24,33 @@ fun RegistrationScreen(
     var phone by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    var participationType by remember { mutableStateOf("CARGO_OWNER") }
-    var validationError by remember { mutableStateOf<String?>(null) }
+    var participationType by remember { mutableStateOf("") }
+    var ownerKind by remember { mutableStateOf("INDIVIDUAL") }
+    var companyName by remember { mutableStateOf("") }
+
+    var nameError by remember { mutableStateOf<String?>(null) }
+    var emailError by remember { mutableStateOf<String?>(null) }
+    var phoneError by remember { mutableStateOf<String?>(null) }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+    var confirmPasswordError by remember { mutableStateOf<String?>(null) }
+    var participationError by remember { mutableStateOf<String?>(null) }
+    var companyNameError by remember { mutableStateOf<String?>(null) }
 
     val authState by viewModel.authState.collectAsState()
 
+    // Pre-fill email if recovering from ProfileIncomplete
     LaunchedEffect(authState) {
-        if (authState is AuthState.Authenticated) {
+        if (authState is AuthState.ProfileIncomplete) {
+            val incompleteState = authState as AuthState.ProfileIncomplete
+            if (incompleteState.email != null && email.isEmpty()) {
+                email = incompleteState.email
+                // Prompt user to finish setting up
+            }
+        }
+    }
+
+    LaunchedEffect(authState) {
+        if (authState is AuthState.RegistrationSuccess) {
             onRegisterSuccess()
         }
     }
@@ -58,13 +78,16 @@ fun RegistrationScreen(
 
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it },
+                onValueChange = { name = it; nameError = null },
                 label = { Text("Full Name") },
+                isError = nameError != null,
+                supportingText = { if (nameError != null) Text(nameError!!) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    errorBorderColor = MaterialTheme.colorScheme.error
                 )
             )
 
@@ -72,13 +95,16 @@ fun RegistrationScreen(
 
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = { email = it; emailError = null },
                 label = { Text("Email") },
+                isError = emailError != null,
+                supportingText = { if (emailError != null) Text(emailError!!) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    errorBorderColor = MaterialTheme.colorScheme.error
                 )
             )
 
@@ -86,13 +112,16 @@ fun RegistrationScreen(
 
             OutlinedTextField(
                 value = phone,
-                onValueChange = { phone = it },
+                onValueChange = { phone = it; phoneError = null },
                 label = { Text("Phone Number (e.g. +2547...)") },
+                isError = phoneError != null,
+                supportingText = { if (phoneError != null) Text(phoneError!!) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    errorBorderColor = MaterialTheme.colorScheme.error
                 )
             )
 
@@ -100,14 +129,17 @@ fun RegistrationScreen(
 
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = { password = it; passwordError = null },
                 label = { Text("Password") },
+                isError = passwordError != null,
+                supportingText = { if (passwordError != null) Text(passwordError!!) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    errorBorderColor = MaterialTheme.colorScheme.error
                 )
             )
 
@@ -115,14 +147,17 @@ fun RegistrationScreen(
 
             OutlinedTextField(
                 value = confirmPassword,
-                onValueChange = { confirmPassword = it },
+                onValueChange = { confirmPassword = it; confirmPasswordError = null },
                 label = { Text("Confirm Password") },
+                isError = confirmPasswordError != null,
+                supportingText = { if (confirmPasswordError != null) Text(confirmPasswordError!!) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    errorBorderColor = MaterialTheme.colorScheme.error
                 )
             )
 
@@ -140,7 +175,7 @@ fun RegistrationScreen(
                 FilterChip(
                     selected = participationType == "TRUCK_OPERATOR",
                     onClick = { participationType = "TRUCK_OPERATOR" },
-                    label = { Text("Truck Operator") },
+                    label = { Text("Truck Driver") },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
                         selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
@@ -157,34 +192,115 @@ fun RegistrationScreen(
                         labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
-                FilterChip(
-                    selected = participationType == "BOTH",
-                    onClick = { participationType = "BOTH" },
-                    label = { Text("Both") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+            }
+
+            if (participationType == "CARGO_OWNER") {
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = ownerKind == "INDIVIDUAL",
+                        onClick = { ownerKind = "INDIVIDUAL" }
                     )
-                )
+                    Text("Individual", color = MaterialTheme.colorScheme.onSurface)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    RadioButton(
+                        selected = ownerKind == "COMPANY",
+                        onClick = { ownerKind = "COMPANY" }
+                    )
+                    Text("Company", color = MaterialTheme.colorScheme.onSurface)
+                }
+
+                if (ownerKind == "COMPANY") {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = companyName,
+                        onValueChange = { companyName = it; companyNameError = null },
+                        label = { Text("Company Name") },
+                        isError = companyNameError != null,
+                        supportingText = { if (companyNameError != null) Text(companyNameError!!) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            errorBorderColor = MaterialTheme.colorScheme.error
+                        )
+                    )
+                }
+            }
+            if (participationError != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(text = participationError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             if (authState is AuthState.Loading) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = (authState as AuthState.Loading).message, 
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             } else {
                 Button(
                     onClick = {
-                        if (name.isBlank() || email.isBlank() || phone.isBlank() || password.isBlank()) {
-                            validationError = "All fields are required"
-                        } else if (password != confirmPassword) {
-                            validationError = "Passwords do not match"
-                        } else if (password.length < 6) {
-                            validationError = "Password must be at least 6 characters"
-                        } else {
-                            validationError = null
-                            viewModel.register(name.trim(), email.trim(), phone.trim(), password, participationType)
+                        var isValid = true
+                        if (name.isBlank()) { nameError = "Full Name is required"; isValid = false }
+                        
+                        if (email.isBlank()) { 
+                            emailError = "Email is required"
+                            isValid = false 
+                        } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                            emailError = "Enter a valid email address"
+                            isValid = false
+                        }
+                        
+                        val phoneRegex = Regex("^\\+254\\d{9}$")
+                        if (phone.isBlank()) { 
+                            phoneError = "Phone number is required"
+                            isValid = false 
+                        } else if (!phone.matches(phoneRegex)) {
+                            phoneError = "Enter valid format (e.g. +254712345678)"
+                            isValid = false
+                        }
+
+                        if (password.isBlank()) { 
+                            passwordError = "Password is required"
+                            isValid = false 
+                        } else if (password.length < 6) { 
+                            passwordError = "Password must be at least 6 characters"
+                            isValid = false 
+                        }
+
+                        if (confirmPassword != password) { 
+                            confirmPasswordError = "Passwords do not match"
+                            isValid = false 
+                        }
+
+                        if (participationType.isBlank()) { 
+                            participationError = "Please select a participation role"
+                            isValid = false 
+                        }
+
+                        if (participationType == "CARGO_OWNER" && ownerKind == "COMPANY" && companyName.isBlank()) {
+                            companyNameError = "Company name is required"
+                            isValid = false
+                        }
+
+                        if (isValid) {
+                            viewModel.register(
+                                name = name.trim(),
+                                email = email.trim(),
+                                phone = phone.trim(),
+                                pass = password,
+                                participationType = participationType,
+                                ownerKind = if (participationType == "CARGO_OWNER") ownerKind else null,
+                                companyName = if (participationType == "CARGO_OWNER" && ownerKind == "COMPANY") companyName.trim() else null
+                            )
                         }
                     },
                     modifier = Modifier
@@ -197,11 +313,6 @@ fun RegistrationScreen(
                 ) {
                     Text("Register")
                 }
-            }
-
-            if (validationError != null) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(text = validationError!!, color = MaterialTheme.colorScheme.error)
             }
 
             if (authState is AuthState.Error) {

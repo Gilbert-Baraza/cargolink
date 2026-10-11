@@ -19,6 +19,9 @@ fun LoginScreen(
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var emailError by remember { mutableStateOf<String?>(null) }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+
     val authState by viewModel.authState.collectAsState()
 
     LaunchedEffect(authState) {
@@ -49,13 +52,16 @@ fun LoginScreen(
 
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = { email = it; emailError = null },
                 label = { Text("Email") },
+                isError = emailError != null,
+                supportingText = { if (emailError != null) Text(emailError!!) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    errorBorderColor = MaterialTheme.colorScheme.error
                 )
             )
 
@@ -63,28 +69,56 @@ fun LoginScreen(
 
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = { password = it; passwordError = null },
                 label = { Text("Password") },
+                isError = passwordError != null,
+                supportingText = { if (passwordError != null) Text(passwordError!!) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    errorBorderColor = MaterialTheme.colorScheme.error
                 )
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
             if (authState is AuthState.Loading) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = (authState as AuthState.Loading).message, 
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             } else {
                 Button(
-                    onClick = { viewModel.login(email.trim(), password) },
+                    onClick = {
+                        var isValid = true
+                        if (email.isBlank()) {
+                            emailError = "Email is required"
+                            isValid = false
+                        } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                            emailError = "Enter a valid email address"
+                            isValid = false
+                        }
+
+                        if (password.isBlank()) {
+                            passwordError = "Password is required"
+                            isValid = false
+                        }
+
+                        if (isValid) {
+                            viewModel.login(email.trim(), password)
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
-                    enabled = email.isNotBlank() && password.isNotBlank(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary

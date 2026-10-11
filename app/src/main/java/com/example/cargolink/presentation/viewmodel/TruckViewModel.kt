@@ -33,7 +33,7 @@ sealed class TruckActionState {
 
 class TruckViewModel : ViewModel() {
     private val truckRepository = TruckRepository()
-    private val auth = FirebaseAuth.getInstance()
+    private val auth by lazy { FirebaseAuth.getInstance() }
 
     private val _truckListState = MutableStateFlow<TruckListState>(TruckListState.Loading)
     val truckListState: StateFlow<TruckListState> = _truckListState.asStateFlow()

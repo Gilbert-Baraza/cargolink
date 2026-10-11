@@ -9,6 +9,8 @@ data class UserDto(
     @SerializedName("email") val email: String = "",
     @SerializedName("phone") val phone: String = "",
     @SerializedName("participation_type") val participationType: String = "",
+    @SerializedName("owner_kind") val ownerKind: String? = null,
+    @SerializedName("company_name") val companyName: String? = null,
     @SerializedName("account_status") val accountStatus: String? = null,
     @SerializedName("created_at") val createdAt: String? = null,
     @SerializedName("updated_at") val updatedAt: String? = null
