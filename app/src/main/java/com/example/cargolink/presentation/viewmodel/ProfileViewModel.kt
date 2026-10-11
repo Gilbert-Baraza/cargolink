@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.cargolink.core.common.Resource
 import com.example.cargolink.data.models.UserDto
 import com.example.cargolink.data.repository.UserRepository
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,6 +19,7 @@ sealed class ProfileState {
 
 class ProfileViewModel : ViewModel() {
     private val userRepository = UserRepository()
+    private val auth = FirebaseAuth.getInstance()
 
     private val _profileState = MutableStateFlow<ProfileState>(ProfileState.Loading)
     val profileState: StateFlow<ProfileState> = _profileState.asStateFlow()
@@ -27,9 +29,15 @@ class ProfileViewModel : ViewModel() {
     }
 
     fun fetchProfile() {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            _profileState.value = ProfileState.Error("User not authenticated")
+            return
+        }
+
         viewModelScope.launch {
             _profileState.value = ProfileState.Loading
-            when (val result = userRepository.getProfile()) {
+            when (val result = userRepository.getProfile(uid)) {
                 is Resource.Success -> {
                     if (result.data != null) {
                         _profileState.value = ProfileState.Success(result.data)

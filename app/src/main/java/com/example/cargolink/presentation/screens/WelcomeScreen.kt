@@ -53,9 +53,13 @@ fun WelcomeScreen(
                 onClick = onNavigateToRegister,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp)
+                    .height(50.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
             ) {
-                Text(text = "Create Account", fontSize = 16.sp)
+                Text(text = "Create Account", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -64,9 +68,15 @@ fun WelcomeScreen(
                 onClick = onNavigateToLogin,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp)
+                    .height(50.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary
+                ),
+                border = ButtonDefaults.outlinedButtonBorder(enabled = true).let {
+                    androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                }
             ) {
-                Text(text = "Login", fontSize = 16.sp)
+                Text(text = "Login", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

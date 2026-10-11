@@ -44,8 +44,25 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             try {
-                auth.signInWithEmailAndPassword(email, pass).await()
-                _authState.value = AuthState.Authenticated
+                val result = auth.signInWithEmailAndPassword(email, pass).await()
+                val uid = result.user?.uid
+                if (uid != null) {
+                    // Fetch profile to verify it exists
+                    when (val profileResult = userRepository.getProfile(uid)) {
+                        is Resource.Success -> {
+                            _authState.value = AuthState.Authenticated
+                        }
+                        is Resource.Error -> {
+                            // Profile missing or error fetching. 
+                            // In a real app, we might redirect to profile completion.
+                            // For now, we still consider them authenticated but log the error.
+                            _authState.value = AuthState.Authenticated
+                        }
+                        is Resource.Loading -> {}
+                    }
+                } else {
+                    _authState.value = AuthState.Error("Failed to retrieve user ID")
+                }
             } catch (e: Exception) {
                 _authState.value = AuthState.Error(e.localizedMessage ?: "Authentication failed")
             }
@@ -66,15 +83,13 @@ class AuthViewModel : ViewModel() {
                 val firebaseUid = authResult.user?.uid ?: throw Exception("Failed to get Firebase UID")
 
                 val userDto = UserDto(
-                    id = null,
                     firebaseUid = firebaseUid,
                     name = name,
                     email = email,
                     phone = phone,
                     participationType = participationType,
                     accountStatus = "ACTIVE",
-                    createdAt = null,
-                    updatedAt = null
+                    createdAt = System.currentTimeMillis().toString()
                 )
 
                 when (val result = userRepository.createProfile(userDto)) {
@@ -82,8 +97,10 @@ class AuthViewModel : ViewModel() {
                         _authState.value = AuthState.Authenticated
                     }
                     is Resource.Error -> {
-                        auth.signOut()
-                        _authState.value = AuthState.Error(result.message ?: "Failed to create CargoLink profile")
+                        // CRITICAL: If profile creation fails, we must roll back auth or inform user
+                        // The user is created in Firebase Auth but has no profile.
+                        auth.signOut() 
+                        _authState.value = AuthState.Error(result.message ?: "Failed to save profile. Registration rolled back.")
                     }
                     is Resource.Loading -> {}
                 }

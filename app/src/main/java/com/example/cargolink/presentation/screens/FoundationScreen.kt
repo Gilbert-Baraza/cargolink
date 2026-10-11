@@ -56,7 +56,7 @@ fun FoundationScreen() {
             Text(
                 text = "Phase 0: Project Foundation Active",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.secondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
         }

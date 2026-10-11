@@ -1,43 +1,40 @@
 package com.example.cargolink.data.repository
 
 import com.example.cargolink.core.common.Resource
-import com.example.cargolink.core.network.RetrofitClient
-import com.example.cargolink.core.network.safeApiCall
 import com.example.cargolink.data.models.UserDto
+import com.example.cargolink.data.remote.FirestoreDataSource
 
 class UserRepository {
-    private val api = RetrofitClient.apiService
+    private val firestoreDataSource = FirestoreDataSource()
 
-    suspend fun getProfile(): Resource<UserDto> {
-        return safeApiCall {
-            val response = api.getProfile()
-            if (response.isSuccessful && response.body() != null) {
-                response.body()!!
+    suspend fun getProfile(uid: String): Resource<UserDto> {
+        return try {
+            val user = firestoreDataSource.getUserProfile(uid)
+            if (user != null) {
+                Resource.Success(user)
             } else {
-                throw Exception(response.errorBody()?.string() ?: "Failed to fetch profile")
+                Resource.Error("Profile not found")
             }
+        } catch (e: Exception) {
+            Resource.Error(e.localizedMessage ?: "Failed to fetch profile")
         }
     }
 
     suspend fun createProfile(userDto: UserDto): Resource<UserDto> {
-        return safeApiCall {
-            val response = api.createProfile(userDto)
-            if (response.isSuccessful && response.body() != null) {
-                response.body()!!
+        return try {
+            val success = firestoreDataSource.saveUserProfile(userDto)
+            if (success) {
+                Resource.Success(userDto)
             } else {
-                throw Exception(response.errorBody()?.string() ?: "Failed to create profile")
+                Resource.Error("Failed to save profile to Firestore")
             }
+        } catch (e: Exception) {
+            Resource.Error(e.localizedMessage ?: "Failed to create profile")
         }
     }
 
     suspend fun updateProfile(userDto: UserDto): Resource<UserDto> {
-        return safeApiCall {
-            val response = api.updateProfile(userDto)
-            if (response.isSuccessful && response.body() != null) {
-                response.body()!!
-            } else {
-                throw Exception(response.errorBody()?.string() ?: "Failed to update profile")
-            }
-        }
+        // Reuse createProfile as Firestore .set() handles updates (merging or overwriting)
+        return createProfile(userDto)
     }
 }

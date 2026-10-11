@@ -5,6 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cargolink.presentation.viewmodel.ProfileState
@@ -13,6 +14,7 @@ import com.example.cargolink.presentation.viewmodel.ProfileViewModel
 @Composable
 fun ProfileScreen(
     onLogout: () -> Unit,
+    onNavigateToTrucks: () -> Unit,
     viewModel: ProfileViewModel = viewModel()
 ) {
     val profileState by viewModel.profileState.collectAsState()
@@ -45,17 +47,22 @@ fun ProfileScreen(
             Text(
                 text = "CargoLink Profile",
                 style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
             when (val state = profileState) {
                 is ProfileState.Loading -> {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
                 is ProfileState.Error -> {
-                    Text(text = state.message, color = MaterialTheme.colorScheme.error)
+                    Text(
+                        text = state.message, 
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(onClick = { viewModel.fetchProfile() }) {
                         Text("Retry")
@@ -65,18 +72,19 @@ fun ProfileScreen(
                     val user = state.user
                     if (!isEditing) {
                         Card(
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
-                                Text("Name: ${user.name}", style = MaterialTheme.typography.bodyLarge)
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text("Email: ${user.email}", style = MaterialTheme.typography.bodyLarge)
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text("Phone: ${user.phone}", style = MaterialTheme.typography.bodyLarge)
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text("Role: ${user.participationType}", style = MaterialTheme.typography.bodyLarge)
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text("Status: ${user.accountStatus ?: "ACTIVE"}", style = MaterialTheme.typography.bodyLarge)
+                                ProfileInfoRow("Name", user.name)
+                                ProfileInfoRow("Email", user.email)
+                                ProfileInfoRow("Phone", user.phone)
+                                ProfileInfoRow("Role", user.participationType)
+                                ProfileInfoRow("Status", user.accountStatus ?: "ACTIVE")
                             }
                         }
 
@@ -84,46 +92,87 @@ fun ProfileScreen(
 
                         Button(
                             onClick = { isEditing = true },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
                         ) {
                             Text("Edit Profile")
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Button(
+                            onClick = onNavigateToTrucks,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondary,
+                                contentColor = MaterialTheme.colorScheme.onSecondary
+                            )
+                        ) {
+                            Text("My Listings")
                         }
                     } else {
                         OutlinedTextField(
                             value = name,
                             onValueChange = { name = it },
                             label = { Text("Name") },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface
+                            )
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         OutlinedTextField(
                             value = phone,
                             onValueChange = { phone = it },
                             label = { Text("Phone") },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface
+                            )
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         OutlinedTextField(
                             value = participationType,
                             onValueChange = { participationType = it },
-                            label = { Text("Participation Type (TRUCK_OPERATOR / CARGO_OWNER / BOTH)") },
-                            modifier = Modifier.fillMaxWidth()
+                            label = { Text("Role (TRUCK_OPERATOR / CARGO_OWNER)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface
+                            )
                         )
 
                         Spacer(modifier = Modifier.height(24.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Button(onClick = { isEditing = false }) {
+                            OutlinedButton(
+                                onClick = { isEditing = false },
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Text("Cancel")
                             }
-                            Button(onClick = {
-                                viewModel.updateProfile(name, phone, participationType)
-                                isEditing = false
-                            }) {
-                                Text("Save Changes")
+                            Button(
+                                onClick = {
+                                    viewModel.updateProfile(name, phone, participationType)
+                                    isEditing = false
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Save")
                             }
                         }
                     }
@@ -134,11 +183,35 @@ fun ProfileScreen(
 
             OutlinedButton(
                 onClick = onLogout,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                ),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Logout")
             }
         }
+    }
+}
+
+@Composable
+fun ProfileInfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = "$label:", 
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value, 
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
