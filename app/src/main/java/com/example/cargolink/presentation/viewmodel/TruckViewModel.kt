@@ -38,6 +38,9 @@ class TruckViewModel : ViewModel() {
     private val _truckListState = MutableStateFlow<TruckListState>(TruckListState.Loading)
     val truckListState: StateFlow<TruckListState> = _truckListState.asStateFlow()
 
+    private val _marketplaceTrucksState = MutableStateFlow<TruckListState>(TruckListState.Loading)
+    val marketplaceTrucksState: StateFlow<TruckListState> = _marketplaceTrucksState.asStateFlow()
+
     private val _truckDetailState = MutableStateFlow<TruckDetailState>(TruckDetailState.Idle)
     val truckDetailState: StateFlow<TruckDetailState> = _truckDetailState.asStateFlow()
 
@@ -54,6 +57,21 @@ class TruckViewModel : ViewModel() {
                 }
                 is Resource.Error -> {
                     _truckListState.value = TruckListState.Error(result.message ?: "Unknown error")
+                }
+                is Resource.Loading -> {}
+            }
+        }
+    }
+
+    fun fetchMarketplaceTrucks() {
+        viewModelScope.launch {
+            _marketplaceTrucksState.value = TruckListState.Loading
+            when (val result = truckRepository.getAllAvailableTrucks()) {
+                is Resource.Success -> {
+                    _marketplaceTrucksState.value = TruckListState.Success(result.data ?: emptyList())
+                }
+                is Resource.Error -> {
+                    _marketplaceTrucksState.value = TruckListState.Error(result.message ?: "Unknown error")
                 }
                 is Resource.Loading -> {}
             }
@@ -81,10 +99,16 @@ class TruckViewModel : ViewModel() {
         truckType: String,
         maxPayloadKg: Double,
         currentLocation: String,
+        preferredDestination: String? = null,
         description: String? = null,
+        price: Double? = null,
         status: String = "available"
     ) {
-        val uid = auth.currentUser?.uid ?: return
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            _truckActionState.value = TruckActionState.Error("User not authenticated")
+            return
+        }
         viewModelScope.launch {
             _truckActionState.value = TruckActionState.Loading
             val truck = TruckDto(
@@ -94,6 +118,8 @@ class TruckViewModel : ViewModel() {
                 truckType = truckType,
                 maxPayloadKg = maxPayloadKg,
                 currentLocation = currentLocation,
+                preferredDestination = preferredDestination,
+                price = price,
                 description = description,
                 status = status
             )
@@ -111,8 +137,22 @@ class TruckViewModel : ViewModel() {
     }
 
     fun deleteTruck(truckId: String) {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            _truckActionState.value = TruckActionState.Error("User not authenticated")
+            return
+        }
         viewModelScope.launch {
             _truckActionState.value = TruckActionState.Loading
+            when (val fetchResult = truckRepository.getTruckById(truckId)) {
+                is Resource.Success -> {
+                    if (fetchResult.data?.ownerUid != uid) {
+                        _truckActionState.value = TruckActionState.Error("Unauthorized: You do not own this truck listing.")
+                        return@launch
+                    }
+                }
+                else -> {}
+            }
             when (val result = truckRepository.deleteTruck(truckId)) {
                 is Resource.Success -> {
                     _truckActionState.value = TruckActionState.Success

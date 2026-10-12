@@ -2,11 +2,13 @@ package com.example.cargolink.presentation.navigation
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -14,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -39,13 +42,14 @@ fun CargoLinkNavGraph(
 ) {
     val authState by authViewModel.authState.collectAsState()
     val truckViewModel: TruckViewModel = viewModel()
+    val cargoViewModel: com.example.cargolink.presentation.viewmodel.CargoViewModel = viewModel()
 
     when (authState) {
         is AuthState.Initial -> {
             LoadingScreen("Checking session...")
         }
         is AuthState.Authenticated -> {
-            AuthenticatedNavGraph(authViewModel, truckViewModel)
+            AuthenticatedNavGraph(authViewModel, truckViewModel, cargoViewModel)
         }
         else -> {
             UnauthenticatedNavGraph(authViewModel)
@@ -84,28 +88,41 @@ fun LoadingScreen(message: String = "Preparing CargoLink…") {
 @Composable
 fun AuthenticatedNavGraph(
     authViewModel: AuthViewModel,
-    truckViewModel: TruckViewModel
+    truckViewModel: TruckViewModel,
+    cargoViewModel: com.example.cargolink.presentation.viewmodel.CargoViewModel
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val profileViewModel: com.example.cargolink.presentation.viewmodel.ProfileViewModel = viewModel()
     val profileState by profileViewModel.profileState.collectAsState()
+    val user = (profileState as? com.example.cargolink.presentation.viewmodel.ProfileState.Success)?.user
 
     val bottomBarScreens = listOf(
         Screen.Home.route,
         Screen.Explore.route,
         Screen.TruckList.route,
+        Screen.MyListings.route,
         Screen.Activity.route,
         Screen.Profile.route
     )
 
     val showBottomBar = currentDestination?.route in bottomBarScreens
 
+    val navigateToTopLevel = { route: String ->
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
-                CargoLinkBottomBar(navController, currentDestination)
+                CargoLinkBottomBar(navController, currentDestination, profileState)
             }
         }
     ) { innerPadding ->
@@ -115,34 +132,46 @@ fun AuthenticatedNavGraph(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Home.route) {
-                val user = (profileState as? com.example.cargolink.presentation.viewmodel.ProfileState.Success)?.user
-                
                 HomeScreen(
                     userName = user?.name?.substringBefore(" ") ?: "User",
                     participationType = user?.participationType,
-                    onFindTruck = { navController.navigate(Screen.Explore.route) },
-                    onPostCargo = { navController.navigate(Screen.TruckAddEdit.createRoute("new")) },
+                    onFindTruck = { navigateToTopLevel(Screen.Explore.route) },
+                    onPostCargo = { navigateToTopLevel(Screen.MyListings.route) },
                     onOfferCapacity = { navController.navigate(Screen.TruckAddEdit.createRoute("new")) },
-                    onViewMyListings = { navController.navigate(Screen.TruckList.route) },
+                    onViewMyListings = {
+                        if (user?.participationType == "CARGO_OWNER") {
+                            navigateToTopLevel(Screen.MyListings.route)
+                        } else {
+                            navigateToTopLevel(Screen.TruckList.route)
+                        }
+                    },
                     onNavigateToDetails = { truckId ->
                         navController.navigate(Screen.TruckDetail.createRoute(truckId))
                     },
-                    onNavigateToProfile = { navController.navigate(Screen.Profile.route) },
-                    onNavigateToExplore = { navController.navigate(Screen.Explore.route) }
+                    onNavigateToProfile = { navigateToTopLevel(Screen.Profile.route) },
+                    onNavigateToExplore = { navigateToTopLevel(Screen.Explore.route) }
                 )
             }
             composable(Screen.Explore.route) {
                 ExploreScreen(
-                    onNavigateToDetails = { truckId ->
-                        navController.navigate(Screen.TruckDetail.createRoute(truckId))
+                    participationType = user?.participationType,
+                    onNavigateToDetails = { id ->
+                        if (user?.participationType == "TRUCK_DRIVER" || user?.participationType == "TRUCK_OPERATOR") {
+                            navController.navigate(Screen.CargoDetail.createRoute(id))
+                        } else {
+                            navController.navigate(Screen.TruckDetail.createRoute(id))
+                        }
                     },
-                    onNavigateToProfile = { navController.navigate(Screen.Profile.route) }
+                    onNavigateToProfile = { navigateToTopLevel(Screen.Profile.route) },
+                    viewModel = truckViewModel,
+                    cargoViewModel = cargoViewModel
                 )
             }
             composable(Screen.Activity.route) {
                 ActivityScreen(
+                    participationType = user?.participationType,
                     onNavigateToDetails = { id ->
-                        navController.navigate(Screen.TruckDetail.createRoute("TRK-49122"))
+                        navController.navigate(Screen.TruckDetail.createRoute(id))
                     }
                 )
             }
@@ -152,7 +181,11 @@ fun AuthenticatedNavGraph(
                         authViewModel.logout()
                     },
                     onNavigateToTrucks = {
-                        navController.navigate(Screen.TruckList.route)
+                        if (user?.participationType == "CARGO_OWNER") {
+                            navigateToTopLevel(Screen.MyListings.route)
+                        } else {
+                            navigateToTopLevel(Screen.TruckList.route)
+                        }
                     }
                 )
             }
@@ -164,8 +197,28 @@ fun AuthenticatedNavGraph(
                     onNavigateToDetail = { truckId ->
                         navController.navigate(Screen.TruckDetail.createRoute(truckId))
                     },
-                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateBack = {
+                        if (!navController.popBackStack()) {
+                            navigateToTopLevel(Screen.Home.route)
+                        }
+                    },
                     viewModel = truckViewModel
+                )
+            }
+            composable(Screen.MyListings.route) {
+                CargoListScreen(
+                    onNavigateToAdd = {
+                        navController.navigate(Screen.TruckAddEdit.createRoute("new"))
+                    },
+                    onNavigateToDetail = { cargoId ->
+                        navController.navigate(Screen.CargoDetail.createRoute(cargoId))
+                    },
+                    onNavigateBack = {
+                        if (!navController.popBackStack()) {
+                            navigateToTopLevel(Screen.Home.route)
+                        }
+                    },
+                    viewModel = cargoViewModel
                 )
             }
             composable(
@@ -177,7 +230,8 @@ fun AuthenticatedNavGraph(
                     truckId = if (truckId == "new") null else truckId,
                     onSaveSuccess = { navController.popBackStack() },
                     onNavigateBack = { navController.popBackStack() },
-                    viewModel = truckViewModel
+                    viewModel = truckViewModel,
+                    cargoViewModel = cargoViewModel
                 )
             }
             composable(
@@ -187,7 +241,8 @@ fun AuthenticatedNavGraph(
                 val truckId = backStackEntry.arguments?.getString("truckId") ?: ""
                 TruckDetailScreen(
                     truckId = truckId,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    viewModel = truckViewModel
                 )
             }
             composable(
@@ -197,7 +252,8 @@ fun AuthenticatedNavGraph(
                 val cargoId = backStackEntry.arguments?.getString("cargoId") ?: ""
                 CargoDetailScreen(
                     cargoId = cargoId,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    viewModel = cargoViewModel
                 )
             }
         }
@@ -209,17 +265,10 @@ fun UnauthenticatedNavGraph(
     authViewModel: AuthViewModel
 ) {
     val navController = rememberNavController()
-    val authState by authViewModel.authState.collectAsState()
-
-    val startDest = if (authState is AuthState.ProfileIncomplete) {
-        Screen.Register.route
-    } else {
-        Screen.Welcome.route
-    }
 
     NavHost(
         navController = navController,
-        startDestination = startDest
+        startDestination = Screen.Welcome.route
     ) {
         composable(Screen.Welcome.route) {
             WelcomeScreen(
@@ -252,14 +301,31 @@ fun UnauthenticatedNavGraph(
 }
 
 @Composable
-fun CargoLinkBottomBar(navController: NavHostController, currentDestination: NavDestination?) {
-    val items = listOf(
-        BottomNavItem("Home", Screen.Home.route, Icons.Default.Home),
-        BottomNavItem("Explore", Screen.Explore.route, Icons.Default.Explore),
-        BottomNavItem("My Listings", Screen.TruckList.route, Icons.Default.Inventory),
-        BottomNavItem("Activity", Screen.Activity.route, Icons.Default.Notifications),
-        BottomNavItem("Profile", Screen.Profile.route, Icons.Default.AccountCircle)
-    )
+fun CargoLinkBottomBar(
+    navController: NavHostController, 
+    currentDestination: NavDestination?,
+    profileState: com.example.cargolink.presentation.viewmodel.ProfileState
+) {
+    val participationType = (profileState as? com.example.cargolink.presentation.viewmodel.ProfileState.Success)?.user?.participationType
+    val isDriver = participationType == "TRUCK_DRIVER" || participationType == "TRUCK_OPERATOR"
+
+    val items = if (isDriver) {
+        listOf(
+            BottomNavItem("Home", Screen.Home.route, Icons.Default.Home),
+            BottomNavItem("Find Cargo", Screen.Explore.route, Icons.Default.Search),
+            BottomNavItem("My Trucks", Screen.TruckList.route, Icons.Default.LocalShipping),
+            BottomNavItem("Activity", Screen.Activity.route, Icons.Default.Notifications),
+            BottomNavItem("Profile", Screen.Profile.route, Icons.Default.AccountCircle)
+        )
+    } else {
+        listOf(
+            BottomNavItem("Home", Screen.Home.route, Icons.Default.Home),
+            BottomNavItem("Find Trucks", Screen.Explore.route, Icons.Default.Search),
+            BottomNavItem("My Shipments", Screen.MyListings.route, Icons.Default.Inventory),
+            BottomNavItem("Activity", Screen.Activity.route, Icons.Default.Notifications),
+            BottomNavItem("Profile", Screen.Profile.route, Icons.Default.AccountCircle)
+        )
+    }
 
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -270,20 +336,7 @@ fun CargoLinkBottomBar(navController: NavHostController, currentDestination: Nav
             val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
             NavigationBarItem(
                 icon = {
-                    if (item.route == Screen.Activity.route) {
-                        BadgedBox(
-                            badge = { 
-                                Badge(
-                                    containerColor = Color.Red,
-                                    modifier = Modifier.size(6.dp)
-                                ) 
-                            }
-                        ) {
-                            Icon(item.icon, contentDescription = item.label)
-                        }
-                    } else {
-                        Icon(item.icon, contentDescription = item.label)
-                    }
+                    Icon(item.icon, contentDescription = item.label)
                 },
                 label = { Text(item.label) },
                 selected = selected,
@@ -309,3 +362,66 @@ fun CargoLinkBottomBar(navController: NavHostController, currentDestination: Nav
 }
 
 data class BottomNavItem(val label: String, val route: String, val icon: ImageVector)
+
+@Composable
+fun EmptyShipmentsScreen(onNavigateBack: () -> Unit) {
+    Scaffold(
+        topBar = {
+            @OptIn(ExperimentalMaterial3Api::class)
+            TopAppBar(
+                title = { Text("My Shipments", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Inventory,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "No shipments found",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "Post your first cargo requirement to start receiving offers from verified transporters.",
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(
+                onClick = { /* TODO */ },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Text("Post First Shipment")
+            }
+        }
+    }
+}

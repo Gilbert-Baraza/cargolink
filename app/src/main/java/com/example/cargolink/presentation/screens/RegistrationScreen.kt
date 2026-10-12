@@ -38,17 +38,6 @@ fun RegistrationScreen(
 
     val authState by viewModel.authState.collectAsState()
 
-    // Pre-fill email if recovering from ProfileIncomplete
-    LaunchedEffect(authState) {
-        if (authState is AuthState.ProfileIncomplete) {
-            val incompleteState = authState as AuthState.ProfileIncomplete
-            if (incompleteState.email != null && email.isEmpty()) {
-                email = incompleteState.email
-                // Prompt user to finish setting up
-            }
-        }
-    }
-
     LaunchedEffect(authState) {
         if (authState is AuthState.RegistrationSuccess) {
             onRegisterSuccess()
@@ -173,8 +162,8 @@ fun RegistrationScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 FilterChip(
-                    selected = participationType == "TRUCK_OPERATOR",
-                    onClick = { participationType = "TRUCK_OPERATOR" },
+                    selected = participationType == "TRUCK_DRIVER",
+                    onClick = { participationType = "TRUCK_DRIVER" },
                     label = { Text("Truck Driver") },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,

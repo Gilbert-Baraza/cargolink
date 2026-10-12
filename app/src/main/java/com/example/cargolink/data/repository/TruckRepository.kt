@@ -16,6 +16,15 @@ class TruckRepository {
         }
     }
 
+    suspend fun getAllAvailableTrucks(): Resource<List<TruckDto>> {
+        return try {
+            val trucks = firestoreDataSource.getAllAvailableTrucks()
+            Resource.Success(trucks)
+        } catch (e: Exception) {
+            Resource.Error(e.localizedMessage ?: "Failed to fetch available trucks")
+        }
+    }
+
     suspend fun getTruckById(truckId: String): Resource<TruckDto> {
         return try {
             val truck = firestoreDataSource.getTruckById(truckId)

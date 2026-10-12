@@ -171,7 +171,7 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (participationType == "TRUCK_DRIVER") {
+                if (participationType == "TRUCK_DRIVER" || participationType == "TRUCK_OPERATOR") {
                     Surface(
                         onClick = onOfferCapacity,
                         modifier = Modifier.weight(1f),
@@ -212,7 +212,7 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "Marketplace Activity",
+                text = "Dashboard",
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold, 
                     color = MaterialTheme.colorScheme.onBackground
@@ -221,37 +221,68 @@ fun HomeScreen(
             
             Spacer(modifier = Modifier.height(12.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                MarketplaceCard(
-                    title = "My Trucks",
-                    content = {
-                        Column {
-                            Text("SCANIA R450", style = MaterialTheme.typography.bodySmall)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            StatusChip("AVAILABLE", Color(0xFF4CAF50))
-                        }
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-                MarketplaceCard(
-                    title = "My Cargo",
-                    content = {
-                        Column {
-                            Text("MAIZE - 15 Tons", style = MaterialTheme.typography.bodySmall)
-                            StatusChip("PENDING", Color(0xFFFFA000))
-                        }
-                    },
-                    modifier = Modifier.weight(1f)
-                )
+            if (participationType == "TRUCK_DRIVER") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    MarketplaceCard(
+                        title = "My Trucks",
+                        content = {
+                            Column {
+                                Text("View and manage", style = MaterialTheme.typography.bodySmall)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                StatusChip("ACTIVE LISTINGS", Color(0xFF4CAF50))
+                            }
+                        },
+                        modifier = Modifier.weight(1f).clickable { onViewMyListings() }
+                    )
+                    MarketplaceCard(
+                        title = "Cargo Available",
+                        content = {
+                            Column {
+                                Text("Find new loads", style = MaterialTheme.typography.bodySmall)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                StatusChip("EXPLORE", Color(0xFF2196F3))
+                            }
+                        },
+                        modifier = Modifier.weight(1f).clickable { onNavigateToExplore() }
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    MarketplaceCard(
+                        title = "My Shipments",
+                        content = {
+                            Column {
+                                Text("Manage active cargo", style = MaterialTheme.typography.bodySmall)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                StatusChip("ACTIVE", Color(0xFF4CAF50))
+                            }
+                        },
+                        modifier = Modifier.weight(1f).clickable { onPostCargo() } // Navigates to My Listings for owners
+                    )
+                    MarketplaceCard(
+                        title = "Find Trucks",
+                        content = {
+                            Column {
+                                Text("Browse transporters", style = MaterialTheme.typography.bodySmall)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                StatusChip("EXPLORE", Color(0xFF2196F3))
+                            }
+                        },
+                        modifier = Modifier.weight(1f).clickable { onFindTruck() }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "Recent Matches",
+                text = "Recent Activity",
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold, 
                     color = MaterialTheme.colorScheme.onBackground
@@ -266,16 +297,17 @@ fun HomeScreen(
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.surface)
             ) {
-                repeat(3) { index ->
-                    MatchItem(
-                        title = if (index == 2) "CEMENT - 33 Tons" else "SCANIA R450 - 28 Tons",
-                        subtitle = if (index == 2) "Status: Loaded" else "Match ID: 1",
-                        onClick = { /* TODO */ }
-                    )
-                    if (index < 2) HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp), 
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant
+                // Empty state for activity on home screen (since no backend exists yet)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No recent activity to display.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

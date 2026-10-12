@@ -20,23 +20,44 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.cargolink.presentation.viewmodel.CargoListState
+import com.example.cargolink.presentation.viewmodel.CargoViewModel
+import com.example.cargolink.presentation.viewmodel.TruckListState
+import com.example.cargolink.presentation.viewmodel.TruckViewModel
 import com.example.cargolink.ui.theme.CargoLinkTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExploreScreen(
+    participationType: String? = null,
     onNavigateToDetails: (String) -> Unit = {},
-    onNavigateToProfile: () -> Unit = {}
+    onNavigateToProfile: () -> Unit = {},
+    viewModel: TruckViewModel = viewModel(),
+    cargoViewModel: CargoViewModel = viewModel()
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) } // 0 for Trucks, 1 for Cargo
     var searchQuery by remember { mutableStateOf("") }
+    
+    // Determine the view mode based on the user's role
+    val viewMode = if (participationType == "TRUCK_DRIVER" || participationType == "TRUCK_OPERATOR") "Cargo" else "Trucks"
+
+    val marketplaceTrucksState by viewModel.marketplaceTrucksState.collectAsState()
+    val marketplaceCargoState by cargoViewModel.marketplaceCargoState.collectAsState()
+
+    LaunchedEffect(viewMode) {
+        if (viewMode == "Trucks") {
+            viewModel.fetchMarketplaceTrucks()
+        } else {
+            cargoViewModel.fetchMarketplaceCargo()
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        "CargoLink",
+                        if (viewMode == "Cargo") "Find Cargo" else "Find Trucks",
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold
                         )
@@ -66,17 +87,6 @@ fun ExploreScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         )
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .size(8.dp)
-                                .padding(1.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surface)
-                                .padding(1.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF4CAF50))
-                        )
                     }
                 }
             )
@@ -88,62 +98,6 @@ fun ExploreScreen(
                 .padding(padding)
         ) {
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                Text(
-                    text = "Explore Marketplace",
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    ),
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-
-                // Segmented Control
-                SingleChoiceSegmentedButtonRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                ) {
-                    SegmentedButton(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                        icon = {
-                            Icon(
-                                Icons.Default.LocalShipping,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        },
-                        colors = SegmentedButtonDefaults.colors(
-                            activeContainerColor = MaterialTheme.colorScheme.primary,
-                            activeContentColor = MaterialTheme.colorScheme.onPrimary,
-                            inactiveContainerColor = Color.Transparent,
-                            inactiveContentColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Text("Trucks")
-                    }
-                    SegmentedButton(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                        icon = {
-                            Icon(
-                                Icons.Default.Inventory2,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        },
-                        colors = SegmentedButtonDefaults.colors(
-                            activeContainerColor = MaterialTheme.colorScheme.primary,
-                            activeContentColor = MaterialTheme.colorScheme.onPrimary,
-                            inactiveContainerColor = Color.Transparent,
-                            inactiveContentColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Text("Cargo")
-                    }
-                }
 
                 // Search and Filter Row
                 Row(
@@ -155,7 +109,7 @@ fun ExploreScreen(
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        placeholder = { Text("Search routes, origins...", fontSize = 14.sp) },
+                        placeholder = { Text(if (viewMode == "Cargo") "Search cargo routes..." else "Search truck routes...", fontSize = 14.sp) },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                         trailingIcon = {
                             IconButton(onClick = { /* TODO */ }) {
@@ -171,75 +125,153 @@ fun ExploreScreen(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            focusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            focusedTrailingIconColor = MaterialTheme.colorScheme.primary,
-                            unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                         ),
                         singleLine = true
                     )
                 }
-
-                // Quick Filters
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(vertical = 8.dp)
-                ) {
-                    item {
-                        FilterChip(
-                            selected = false,
-                            onClick = { },
-                            label = { Text("Nairobi → Mombasa") },
-                            leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                containerColor = MaterialTheme.colorScheme.surface
-                            )
-                        )
-                    }
-                    item {
-                        FilterChip(
-                            selected = false,
-                            onClick = { },
-                            label = { Text("Today") },
-                            leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                containerColor = MaterialTheme.colorScheme.surface
-                            )
-                        )
-                    }
-                    item {
-                        FilterChip(
-                            selected = false,
-                            onClick = { },
-                            label = { Text("10+ Tons") },
-                            leadingIcon = { Icon(Icons.Default.Scale, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                containerColor = MaterialTheme.colorScheme.surface
-                            )
-                        )
-                    }
-                }
             }
 
-            // Results List
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            // Results List / Empty State
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background),
+                contentAlignment = Alignment.Center
             ) {
-                if (selectedTab == 0) {
-                    items(sampleTrucks) { truck ->
-                        TruckListingCard(truck, onClick = { onNavigateToDetails(truck.id) })
+                if (viewMode == "Trucks") {
+                    when (val state = marketplaceTrucksState) {
+                        is TruckListState.Loading -> {
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        }
+                        is TruckListState.Error -> {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(state.message, color = MaterialTheme.colorScheme.error)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(onClick = { viewModel.fetchMarketplaceTrucks() }) {
+                                    Text("Retry")
+                                }
+                            }
+                        }
+                        is TruckListState.Success -> {
+                            val filteredTrucks = state.trucks.filter {
+                                searchQuery.isBlank() ||
+                                        it.registrationNumber.contains(searchQuery, ignoreCase = true) ||
+                                        it.currentLocation.contains(searchQuery, ignoreCase = true) ||
+                                        it.truckType.contains(searchQuery, ignoreCase = true)
+                            }
+                            if (filteredTrucks.isEmpty()) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Default.LocalShipping,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(64.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "No trucks available",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Check back later when transporters post their availability.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    items(filteredTrucks) { truck ->
+                                        TruckListingCard(
+                                            truck = TruckSample(
+                                                id = truck.id ?: "",
+                                                companyName = truck.registrationNumber,
+                                                isVerified = true,
+                                                rating = 4.8,
+                                                origin = truck.currentLocation,
+                                                destination = truck.preferredDestination ?: "Flexible",
+                                                capacity = "${truck.maxPayloadKg} kg",
+                                                availabilityDate = "Available Now",
+                                                price = if (truck.price != null && truck.price > 0) "${truck.currency} ${"%.0f".format(truck.price)}" else "Negotiable",
+                                                status = truck.status.uppercase()
+                                            ),
+                                            onClick = { onNavigateToDetails(truck.id ?: "") }
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 } else {
-                    items(sampleCargo) { cargo ->
-                        CargoListingCard(cargo, onClick = { onNavigateToDetails(cargo.id) })
+                    when (val state = marketplaceCargoState) {
+                        is CargoListState.Loading -> {
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        }
+                        is CargoListState.Error -> {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(state.message, color = MaterialTheme.colorScheme.error)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(onClick = { cargoViewModel.fetchMarketplaceCargo() }) {
+                                    Text("Retry")
+                                }
+                            }
+                        }
+                        is CargoListState.Success -> {
+                            val filteredCargo = state.cargoList.filter {
+                                searchQuery.isBlank() ||
+                                        it.cargoType.contains(searchQuery, ignoreCase = true) ||
+                                        it.pickupLocation.contains(searchQuery, ignoreCase = true) ||
+                                        it.destination.contains(searchQuery, ignoreCase = true)
+                            }
+                            if (filteredCargo.isEmpty()) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Default.Inventory2,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(64.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "No cargo available",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Check back later when owners post their requirements.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    items(filteredCargo) { cargo ->
+                                        CargoListingCard(
+                                            cargo = CargoSample(
+                                                id = cargo.id ?: "",
+                                                ownerName = cargo.cargoType,
+                                                cargoType = cargo.cargoType,
+                                                origin = cargo.pickupLocation,
+                                                destination = cargo.destination,
+                                                weight = "${cargo.weightKg} kg",
+                                                date = cargo.preferredDate ?: "Flexible",
+                                                budget = if (cargo.budget != null && cargo.budget > 0) "${cargo.currency} ${"%.0f".format(cargo.budget)}" else "Negotiable"
+                                            ),
+                                            onClick = { onNavigateToDetails(cargo.id ?: "") }
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

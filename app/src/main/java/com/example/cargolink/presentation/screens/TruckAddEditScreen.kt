@@ -20,6 +20,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cargolink.presentation.viewmodel.CargoActionState
+import com.example.cargolink.presentation.viewmodel.CargoViewModel
+import com.example.cargolink.presentation.viewmodel.ProfileState
+import com.example.cargolink.presentation.viewmodel.ProfileViewModel
+import com.example.cargolink.presentation.viewmodel.TruckActionState
+import com.example.cargolink.presentation.viewmodel.TruckDetailState
 import com.example.cargolink.presentation.viewmodel.TruckViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 
@@ -29,18 +35,34 @@ fun TruckAddEditScreen(
     truckId: String?,
     onSaveSuccess: () -> Unit,
     onNavigateBack: () -> Unit,
-    viewModel: TruckViewModel = viewModel()
+    viewModel: TruckViewModel = viewModel(),
+    cargoViewModel: CargoViewModel = viewModel(),
+    profileViewModel: ProfileViewModel = viewModel()
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: Truck, 1: Cargo
+    val profileState by profileViewModel.profileState.collectAsState()
+    val userRole = (profileState as? ProfileState.Success)?.user?.participationType
+
+    val isCargoOwner = userRole == "CARGO_OWNER"
+    val isDriver = userRole == "TRUCK_DRIVER" || userRole == "TRUCK_OPERATOR"
+
+    var selectedTab by remember { mutableIntStateOf(if (isCargoOwner) 1 else 0) } // 0: Truck, 1: Cargo
+
+    LaunchedEffect(userRole) {
+        if (isCargoOwner) {
+            selectedTab = 1
+        } else if (isDriver) {
+            selectedTab = 0
+        }
+    }
     
     // Truck Form State
     var regNumber by remember { mutableStateOf("KCB 456C") }
     var truckType by remember { mutableStateOf("Flatbed") }
-    var payload by remember { mutableStateOf("28 Tons") }
-    var startingLocation by remember { mutableStateOf("Nairobi (Nairobi County)") }
+    var payload by remember { mutableStateOf("28000 kg") }
+    var startingLocation by remember { mutableStateOf("Nairobi") }
     var destination by remember { mutableStateOf("Mombasa") }
     var availabilityDate by remember { mutableStateOf("12 Oct, 2026") }
-    var askingPrice by remember { mutableStateOf("120,000") }
+    var askingPrice by remember { mutableStateOf("120000") }
     var notes by remember { mutableStateOf("Experienced driver, cargo straps included.") }
 
     // Cargo Form State
@@ -49,10 +71,113 @@ fun TruckAddEditScreen(
     var cargoWeight by remember { mutableStateOf("") }
     var budget by remember { mutableStateOf("") }
 
+    val truckDetailState by viewModel.truckDetailState.collectAsState()
+    val truckActionState by viewModel.truckActionState.collectAsState()
+    val cargoActionState by cargoViewModel.cargoActionState.collectAsState()
+
+    LaunchedEffect(truckId) {
+        if (!truckId.isNullOrEmpty() && truckId != "new") {
+            viewModel.fetchTruckDetail(truckId)
+        }
+    }
+
+    var validationError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(truckDetailState) {
+        if (truckDetailState is TruckDetailState.Success) {
+            val truck = (truckDetailState as TruckDetailState.Success).truck
+            regNumber = truck.registrationNumber
+            truckType = truck.truckType
+            payload = if (truck.maxPayloadKg > 0) "${truck.maxPayloadKg.toInt()} kg" else ""
+            startingLocation = truck.currentLocation
+            destination = truck.preferredDestination ?: ""
+            askingPrice = truck.price?.let { "%.0f".format(it) } ?: ""
+            notes = truck.description ?: ""
+        }
+    }
+
+    LaunchedEffect(truckActionState) {
+        if (truckActionState is TruckActionState.Success) {
+            viewModel.resetActionState()
+            onSaveSuccess()
+        }
+    }
+
+    LaunchedEffect(cargoActionState) {
+        if (cargoActionState is CargoActionState.Success) {
+            cargoViewModel.resetActionState()
+            onSaveSuccess()
+        }
+    }
+
+    val onPerformSave: () -> Unit = {
+        if (selectedTab == 0) {
+            val trimmedReg = regNumber.trim()
+            val trimmedType = truckType.trim()
+            val trimmedLocation = startingLocation.trim()
+            val maxPayloadDouble = payload.replace(Regex("[^0-9.]"), "").toDoubleOrNull() ?: 0.0
+            val priceDouble = askingPrice.replace(Regex("[^0-9.]"), "").toDoubleOrNull()
+
+            if (trimmedReg.isEmpty()) {
+                validationError = "Registration number is required."
+            } else if (trimmedLocation.isEmpty()) {
+                validationError = "Starting location is required."
+            } else if (maxPayloadDouble <= 0.0) {
+                validationError = "Maximum payload capacity must be a positive number."
+            } else {
+                validationError = null
+                viewModel.saveTruck(
+                    id = if (truckId == "new") null else truckId,
+                    registrationNumber = trimmedReg,
+                    truckType = trimmedType.ifBlank { "Flatbed" },
+                    maxPayloadKg = maxPayloadDouble,
+                    currentLocation = trimmedLocation,
+                    preferredDestination = destination.trim().ifBlank { null },
+                    price = priceDouble,
+                    description = notes.trim().ifBlank { null }
+                )
+            }
+        } else {
+            val trimmedCargoType = cargoType.trim()
+            val trimmedPickup = pickupLocation.trim()
+            val weightDouble = cargoWeight.replace(Regex("[^0-9.]"), "").toDoubleOrNull() ?: 0.0
+            val budgetDouble = budget.replace(Regex("[^0-9.]"), "").toDoubleOrNull()
+
+            if (trimmedCargoType.isEmpty()) {
+                validationError = "Cargo type / description is required."
+            } else if (trimmedPickup.isEmpty()) {
+                validationError = "Pickup location is required."
+            } else if (weightDouble <= 0.0) {
+                validationError = "Shipment weight must be a positive number."
+            } else {
+                validationError = null
+                cargoViewModel.saveCargo(
+                    id = null,
+                    cargoType = trimmedCargoType,
+                    weightKg = weightDouble,
+                    pickupLocation = trimmedPickup,
+                    destination = destination.trim().ifBlank { "Nairobi" },
+                    budget = budgetDouble,
+                    preferredDate = availabilityDate.trim().ifBlank { null },
+                    specialRequirements = notes.trim().ifBlank { null }
+                )
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Post a Listing", fontWeight = FontWeight.Bold) },
+                title = { 
+                    Text(
+                        if (truckId.isNullOrEmpty() || truckId == "new") {
+                            if (selectedTab == 1) "Post Cargo Requirement" else "Post Truck Availability"
+                        } else {
+                            if (selectedTab == 1) "Edit Cargo Requirement" else "Edit Truck Listing"
+                        }, 
+                        fontWeight = FontWeight.Bold
+                    ) 
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -72,7 +197,11 @@ fun TruckAddEditScreen(
             )
         },
         bottomBar = {
-            BottomActionArea(onCancel = onNavigateBack, onSave = onSaveSuccess)
+            BottomActionArea(
+                onCancel = onNavigateBack, 
+                onSave = onPerformSave,
+                isLoading = truckActionState is TruckActionState.Loading || cargoActionState is CargoActionState.Loading
+            )
         }
     ) { padding ->
         Column(
@@ -84,33 +213,79 @@ fun TruckAddEditScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            SingleChoiceSegmentedButtonRow(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                SegmentedButton(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    icon = { Icon(Icons.Default.LocalShipping, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    label = { Text("Truck Availability") },
-                    colors = SegmentedButtonDefaults.colors(
-                        activeContainerColor = MaterialTheme.colorScheme.primary,
-                        activeContentColor = MaterialTheme.colorScheme.onPrimary,
-                        inactiveContentColor = MaterialTheme.colorScheme.primary
+            if (validationError != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = validationError!!,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(12.dp)
                     )
-                )
-                SegmentedButton(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    icon = { Icon(Icons.Default.Inventory2, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    label = { Text("Cargo Requirements") },
-                    colors = SegmentedButtonDefaults.colors(
-                        activeContainerColor = MaterialTheme.colorScheme.primary,
-                        activeContentColor = MaterialTheme.colorScheme.onPrimary,
-                        inactiveContentColor = MaterialTheme.colorScheme.primary
+                }
+            }
+
+            if (truckActionState is TruckActionState.Error) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = (truckActionState as TruckActionState.Error).message,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(12.dp)
                     )
-                )
+                }
+            }
+
+            if (cargoActionState is CargoActionState.Error) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = (cargoActionState as CargoActionState.Error).message,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+            if (!isCargoOwner && !isDriver) {
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    SegmentedButton(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                        icon = { Icon(Icons.Default.LocalShipping, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        label = { Text("Truck Availability") },
+                        colors = SegmentedButtonDefaults.colors(
+                            activeContainerColor = MaterialTheme.colorScheme.primary,
+                            activeContentColor = MaterialTheme.colorScheme.onPrimary,
+                            inactiveContentColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                    SegmentedButton(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                        icon = { Icon(Icons.Default.Inventory2, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        label = { Text("Cargo Requirements") },
+                        colors = SegmentedButtonDefaults.colors(
+                            activeContainerColor = MaterialTheme.colorScheme.primary,
+                            activeContentColor = MaterialTheme.colorScheme.onPrimary,
+                            inactiveContentColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                }
             }
 
             if (selectedTab == 0) {
@@ -440,26 +615,17 @@ fun ExposedDropdownTextField(
 }
 
 @Composable
-fun BottomActionArea(onCancel: () -> Unit, onSave: () -> Unit) {
+fun BottomActionArea(
+    onCancel: () -> Unit, 
+    onSave: () -> Unit,
+    isLoading: Boolean = false
+) {
     Surface(
         tonalElevation = 8.dp,
         shadowElevation = 8.dp,
         color = MaterialTheme.colorScheme.surface
     ) {
         Column {
-            Surface(
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = "Preview Mode: Actions will save locally without submitting actual requests.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    textAlign = TextAlign.Center
-                )
-            }
-            
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -468,6 +634,7 @@ fun BottomActionArea(onCancel: () -> Unit, onSave: () -> Unit) {
             ) {
                 OutlinedButton(
                     onClick = onCancel,
+                    enabled = !isLoading,
                     modifier = Modifier.weight(1f).height(48.dp),
                     shape = RoundedCornerShape(24.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
@@ -478,6 +645,7 @@ fun BottomActionArea(onCancel: () -> Unit, onSave: () -> Unit) {
                 }
                 Button(
                     onClick = onSave,
+                    enabled = !isLoading,
                     modifier = Modifier.weight(1f).height(48.dp),
                     shape = RoundedCornerShape(24.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -485,7 +653,15 @@ fun BottomActionArea(onCancel: () -> Unit, onSave: () -> Unit) {
                         contentColor = MaterialTheme.colorScheme.onSecondary
                     )
                 ) {
-                    Text("Save Listing", fontWeight = FontWeight.Bold)
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = MaterialTheme.colorScheme.onSecondary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Save Listing", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

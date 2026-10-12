@@ -43,7 +43,8 @@ class AuthViewModel : ViewModel() {
                         _authState.value = AuthState.Authenticated
                     }
                     is Resource.Error -> {
-                        _authState.value = AuthState.ProfileIncomplete(currentUser.uid, currentUser.email)
+                        auth.signOut()
+                        _authState.value = AuthState.Unauthenticated
                     }
                     is Resource.Loading -> {}
                 }
@@ -65,7 +66,7 @@ class AuthViewModel : ViewModel() {
                             _authState.value = AuthState.Authenticated
                         }
                         is Resource.Error -> {
-                            _authState.value = AuthState.ProfileIncomplete(uid, result.user?.email)
+                            _authState.value = AuthState.Error("Profile not found. Please register an account.")
                         }
                         is Resource.Loading -> {}
                     }
@@ -101,7 +102,12 @@ class AuthViewModel : ViewModel() {
                 val firebaseUid = if (currentUser != null && currentUser.email == email) {
                     currentUser.uid
                 } else {
-                    val authResult = auth.createUserWithEmailAndPassword(email, pass).await()
+                    val authResult = try {
+                        auth.createUserWithEmailAndPassword(email, pass).await()
+                    } catch (e: com.google.firebase.auth.FirebaseAuthUserCollisionException) {
+                        // Attempt sign in to recover missing profile for existing auth account
+                        auth.signInWithEmailAndPassword(email, pass).await()
+                    }
                     authResult.user?.uid ?: throw Exception("Failed to get Firebase UID")
                 }
 
@@ -123,7 +129,7 @@ class AuthViewModel : ViewModel() {
                         _authState.value = AuthState.RegistrationSuccess
                     }
                     is Resource.Error -> {
-                        _authState.value = AuthState.Error("Profile creation failed: ${result.message}. Please check connection and click Register to try again.")
+                        _authState.value = AuthState.Error("Profile creation failed: ${result.message}. Please check details and try again.")
                     }
                     is Resource.Loading -> {}
                 }
@@ -132,8 +138,8 @@ class AuthViewModel : ViewModel() {
                     is com.google.firebase.auth.FirebaseAuthUserCollisionException -> "An account already exists with this email address."
                     is com.google.firebase.auth.FirebaseAuthWeakPasswordException -> "Password is too weak. Please use a stronger password."
                     is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException -> "Invalid email format."
-                    is com.google.firebase.FirebaseNetworkException -> "Network error. Please check your internet connection and click Register to try again."
-                    else -> "Registration failed: ${e.localizedMessage}. Please check connection and click Register to try again."
+                    is com.google.firebase.FirebaseNetworkException -> "Network error. Please check your internet connection and try again."
+                    else -> "Registration failed: ${e.localizedMessage}. Please try again."
                 }
                 _authState.value = AuthState.Error(errorMessage)
             }

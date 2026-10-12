@@ -1,6 +1,7 @@
 package com.example.cargolink.data.remote
 
 import android.util.Log
+import com.example.cargolink.data.models.CargoDto
 import com.example.cargolink.data.models.TruckDto
 import com.example.cargolink.data.models.UserDto
 import com.google.firebase.firestore.FirebaseFirestore
@@ -12,6 +13,7 @@ class FirestoreDataSource {
     private val db = FirebaseFirestore.getInstance()
     private val usersCollection = db.collection("users")
     private val trucksCollection = db.collection("trucks")
+    private val cargoCollection = db.collection("cargo")
     private val TAG = "FirestoreDataSource"
 
     // User Profile methods
@@ -22,7 +24,7 @@ class FirestoreDataSource {
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error saving user profile", e)
-            false
+            throw e
         }
     }
 
@@ -61,7 +63,7 @@ class FirestoreDataSource {
             )
 
             if (truck.id != null && truck.id != "new") {
-                trucksCollection.document(truck.id).update(truckMap as Map<String, Any>).await()
+                trucksCollection.document(truck.id).set(truckMap, com.google.firebase.firestore.SetOptions.merge()).await()
             } else {
                 truckMap["createdAt"] = FieldValue.serverTimestamp()
                 trucksCollection.add(truckMap).await()
@@ -78,9 +80,6 @@ class FirestoreDataSource {
         return try {
             Log.d(TAG, "Fetching trucks for ownerUid: $ownerUid")
             
-            // IMPORTANT FIX: Removed .orderBy("createdAt") because it requires a composite index 
-            // in Firestore when combined with .whereEqualTo(). 
-            // Without the index, the query fails silently and returns empty in your previous code.
             val snapshot = trucksCollection
                 .whereEqualTo("ownerUid", ownerUid)
                 .get()
@@ -90,15 +89,28 @@ class FirestoreDataSource {
             
             val trucks = snapshot.toObjects(TruckDto::class.java)
             
-            // Sort in memory instead to avoid the mandatory index requirement for now.
             val sortedTrucks = trucks.sortedByDescending { it.createdAt }
             
             Log.d(TAG, "Successfully mapped ${sortedTrucks.size} trucks")
             sortedTrucks
         } catch (e: Exception) {
             Log.e(TAG, "Error getting trucks by owner: ${e.message}", e)
-            // Rethrowing or returning empty, but the Log.e will now show the actual error in Logcat.
             throw e
+        }
+    }
+
+    suspend fun getAllAvailableTrucks(): List<TruckDto> {
+        return try {
+            val snapshot = trucksCollection
+                .whereEqualTo("status", "available")
+                .get()
+                .await()
+            
+            val trucks = snapshot.toObjects(TruckDto::class.java)
+            trucks.sortedByDescending { it.createdAt }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting all available trucks: ${e.message}", e)
+            emptyList()
         }
     }
 
@@ -122,6 +134,89 @@ class FirestoreDataSource {
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error deleting truck", e)
+            false
+        }
+    }
+
+    // Cargo methods
+    suspend fun saveCargo(cargo: CargoDto): Boolean {
+        return try {
+            val cargoMap = mutableMapOf<String, Any>(
+                "ownerUid" to cargo.ownerUid,
+                "cargoType" to cargo.cargoType,
+                "weightKg" to cargo.weightKg,
+                "pickupLocation" to cargo.pickupLocation,
+                "destination" to cargo.destination,
+                "currency" to cargo.currency,
+                "status" to cargo.status,
+                "updatedAt" to FieldValue.serverTimestamp()
+            )
+            cargo.budget?.let { if (it > 0) cargoMap["budget"] = it }
+            cargo.preferredDate?.let { if (it.isNotBlank()) cargoMap["preferredDate"] = it }
+            cargo.specialRequirements?.let { if (it.isNotBlank()) cargoMap["specialRequirements"] = it }
+
+            if (cargo.id != null && cargo.id != "new") {
+                cargoCollection.document(cargo.id).set(cargoMap, com.google.firebase.firestore.SetOptions.merge()).await()
+            } else {
+                cargoMap["createdAt"] = FieldValue.serverTimestamp()
+                cargoCollection.add(cargoMap).await()
+            }
+            Log.d(TAG, "Cargo requirement saved successfully for owner: ${cargo.ownerUid}")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving cargo requirement for owner: ${cargo.ownerUid}", e)
+            throw e
+        }
+    }
+
+    suspend fun getCargoByOwner(ownerUid: String): List<CargoDto> {
+        return try {
+            val snapshot = cargoCollection
+                .whereEqualTo("ownerUid", ownerUid)
+                .get()
+                .await()
+            val cargoList = snapshot.toObjects(CargoDto::class.java)
+            cargoList.sortedByDescending { it.createdAt }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting cargo by owner", e)
+            emptyList()
+        }
+    }
+
+    suspend fun getAllAvailableCargo(): List<CargoDto> {
+        return try {
+            val snapshot = cargoCollection
+                .whereEqualTo("status", "available")
+                .get()
+                .await()
+            val cargoList = snapshot.toObjects(CargoDto::class.java)
+            cargoList.sortedByDescending { it.createdAt }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting all available cargo", e)
+            emptyList()
+        }
+    }
+
+    suspend fun getCargoById(cargoId: String): CargoDto? {
+        return try {
+            val document = cargoCollection.document(cargoId).get().await()
+            if (document.exists()) {
+                document.toObject(CargoDto::class.java)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting cargo by id", e)
+            null
+        }
+    }
+
+    suspend fun deleteCargo(cargoId: String): Boolean {
+        return try {
+            cargoCollection.document(cargoId).delete().await()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting cargo requirement", e)
             false
         }
     }
