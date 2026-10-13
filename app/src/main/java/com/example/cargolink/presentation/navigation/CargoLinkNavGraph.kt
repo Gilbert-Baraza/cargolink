@@ -1,6 +1,8 @@
 package com.example.cargolink.presentation.navigation
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
@@ -42,14 +44,13 @@ fun CargoLinkNavGraph(
 ) {
     val authState by authViewModel.authState.collectAsState()
     val truckViewModel: TruckViewModel = viewModel()
-    val cargoViewModel: com.example.cargolink.presentation.viewmodel.CargoViewModel = viewModel()
 
     when (authState) {
         is AuthState.Initial -> {
             LoadingScreen("Checking session...")
         }
         is AuthState.Authenticated -> {
-            AuthenticatedNavGraph(authViewModel, truckViewModel, cargoViewModel)
+            AuthenticatedNavGraph(authViewModel, truckViewModel)
         }
         else -> {
             UnauthenticatedNavGraph(authViewModel)
@@ -88,15 +89,15 @@ fun LoadingScreen(message: String = "Preparing CargoLink…") {
 @Composable
 fun AuthenticatedNavGraph(
     authViewModel: AuthViewModel,
-    truckViewModel: TruckViewModel,
-    cargoViewModel: com.example.cargolink.presentation.viewmodel.CargoViewModel
+    truckViewModel: TruckViewModel
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val profileViewModel: com.example.cargolink.presentation.viewmodel.ProfileViewModel = viewModel()
+    val cargoViewModel: com.example.cargolink.presentation.viewmodel.CargoViewModel = viewModel()
+    val requestViewModel: com.example.cargolink.presentation.viewmodel.TransportRequestViewModel = viewModel()
     val profileState by profileViewModel.profileState.collectAsState()
-    val user = (profileState as? com.example.cargolink.presentation.viewmodel.ProfileState.Success)?.user
 
     val bottomBarScreens = listOf(
         Screen.Home.route,
@@ -109,7 +110,9 @@ fun AuthenticatedNavGraph(
 
     val showBottomBar = currentDestination?.route in bottomBarScreens
 
-    val navigateToTopLevel = { route: String ->
+    val user = (profileState as? com.example.cargolink.presentation.viewmodel.ProfileState.Success)?.user
+
+    fun navigateToTopLevel(route: String) {
         navController.navigate(route) {
             popUpTo(navController.graph.findStartDestination().id) {
                 saveState = true
@@ -136,7 +139,13 @@ fun AuthenticatedNavGraph(
                     userName = user?.name?.substringBefore(" ") ?: "User",
                     participationType = user?.participationType,
                     onFindTruck = { navigateToTopLevel(Screen.Explore.route) },
-                    onPostCargo = { navigateToTopLevel(Screen.MyListings.route) },
+                    onPostCargo = {
+                        if (user?.participationType == "CARGO_OWNER") {
+                            navigateToTopLevel(Screen.MyListings.route)
+                        } else {
+                            navController.navigate(Screen.TruckAddEdit.createRoute("new"))
+                        }
+                    },
                     onOfferCapacity = { navController.navigate(Screen.TruckAddEdit.createRoute("new")) },
                     onViewMyListings = {
                         if (user?.participationType == "CARGO_OWNER") {
@@ -171,8 +180,9 @@ fun AuthenticatedNavGraph(
                 ActivityScreen(
                     participationType = user?.participationType,
                     onNavigateToDetails = { id ->
-                        navController.navigate(Screen.TruckDetail.createRoute(id))
-                    }
+                        navController.navigate(Screen.BookingDetail.createRoute(id))
+                    },
+                    viewModel = requestViewModel
                 )
             }
             composable(Screen.Profile.route) {
@@ -197,29 +207,12 @@ fun AuthenticatedNavGraph(
                     onNavigateToDetail = { truckId ->
                         navController.navigate(Screen.TruckDetail.createRoute(truckId))
                     },
-                    onNavigateBack = {
-                        if (!navController.popBackStack()) {
-                            navigateToTopLevel(Screen.Home.route)
-                        }
-                    },
+                    onNavigateBack = { navController.popBackStack() },
                     viewModel = truckViewModel
                 )
             }
             composable(Screen.MyListings.route) {
-                CargoListScreen(
-                    onNavigateToAdd = {
-                        navController.navigate(Screen.TruckAddEdit.createRoute("new"))
-                    },
-                    onNavigateToDetail = { cargoId ->
-                        navController.navigate(Screen.CargoDetail.createRoute(cargoId))
-                    },
-                    onNavigateBack = {
-                        if (!navController.popBackStack()) {
-                            navigateToTopLevel(Screen.Home.route)
-                        }
-                    },
-                    viewModel = cargoViewModel
-                )
+                EmptyShipmentsScreen(onNavigateBack = { navController.popBackStack() })
             }
             composable(
                 route = Screen.TruckAddEdit.route,
@@ -230,8 +223,7 @@ fun AuthenticatedNavGraph(
                     truckId = if (truckId == "new") null else truckId,
                     onSaveSuccess = { navController.popBackStack() },
                     onNavigateBack = { navController.popBackStack() },
-                    viewModel = truckViewModel,
-                    cargoViewModel = cargoViewModel
+                    viewModel = truckViewModel
                 )
             }
             composable(
@@ -242,7 +234,10 @@ fun AuthenticatedNavGraph(
                 TruckDetailScreen(
                     truckId = truckId,
                     onNavigateBack = { navController.popBackStack() },
-                    viewModel = truckViewModel
+                    onNavigateToEdit = { id -> navController.navigate(Screen.TruckAddEdit.createRoute(id)) },
+                    viewModel = truckViewModel,
+                    cargoViewModel = cargoViewModel,
+                    requestViewModel = requestViewModel
                 )
             }
             composable(
@@ -253,7 +248,24 @@ fun AuthenticatedNavGraph(
                 CargoDetailScreen(
                     cargoId = cargoId,
                     onNavigateBack = { navController.popBackStack() },
-                    viewModel = cargoViewModel
+                    onNavigateToEdit = { id -> navController.navigate(Screen.TruckAddEdit.createRoute(id)) },
+                    viewModel = cargoViewModel,
+                    requestViewModel = requestViewModel,
+                    truckViewModel = truckViewModel,
+                    profileViewModel = profileViewModel
+                )
+            }
+            composable(
+                route = Screen.BookingDetail.route,
+                arguments = listOf(navArgument("requestId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val requestId = backStackEntry.arguments?.getString("requestId") ?: ""
+                BookingDetailScreen(
+                    requestId = requestId,
+                    onNavigateBack = { navController.popBackStack() },
+                    viewModel = requestViewModel,
+                    cargoViewModel = cargoViewModel,
+                    truckViewModel = truckViewModel
                 )
             }
         }
@@ -265,10 +277,17 @@ fun UnauthenticatedNavGraph(
     authViewModel: AuthViewModel
 ) {
     val navController = rememberNavController()
+    val authState by authViewModel.authState.collectAsState()
+
+    val startDest = if (authState is AuthState.ProfileIncomplete) {
+        Screen.Register.route
+    } else {
+        Screen.Welcome.route
+    }
 
     NavHost(
         navController = navController,
-        startDestination = Screen.Welcome.route
+        startDestination = startDest
     ) {
         composable(Screen.Welcome.route) {
             WelcomeScreen(
@@ -327,61 +346,81 @@ fun CargoLinkBottomBar(
         )
     }
 
-    NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 8.dp
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 8.dp,
+        shadowElevation = 8.dp,
+        modifier = Modifier.fillMaxWidth()
     ) {
-        items.forEach { item ->
-            val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
-            NavigationBarItem(
-                icon = {
-                    Icon(item.icon, contentDescription = item.label)
-                },
-                label = { Text(item.label) },
-                selected = selected,
-                onClick = {
-                    navController.navigate(item.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items.forEach { item ->
+                val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+
+                Surface(
+                    onClick = {
+                        if (!selected) {
+                            navController.navigate(item.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         }
-                        launchSingleTop = true
-                        restoreState = true
+                    },
+                    shape = RoundedCornerShape(24.dp),
+                    color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    modifier = Modifier.animateContentSize()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(
+                            horizontal = if (selected) 16.dp else 12.dp,
+                            vertical = 10.dp
+                        ),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = item.icon,
+                            contentDescription = item.label,
+                            tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        if (selected) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = item.label,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            )
+                        }
                     }
-                },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.onSecondary,
-                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                    indicatorColor = MaterialTheme.colorScheme.secondary,
-                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            )
+                }
+            }
         }
     }
 }
 
 data class BottomNavItem(val label: String, val route: String, val icon: ImageVector)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EmptyShipmentsScreen(onNavigateBack: () -> Unit) {
+fun EmptyShipmentsScreen(onNavigateBack: () -> Unit = {}) {
     Scaffold(
         topBar = {
-            @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
                 title = { Text("My Shipments", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
         }

@@ -17,9 +17,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.cargolink.presentation.viewmodel.TruckActionState
-import com.example.cargolink.presentation.viewmodel.TruckDetailState
-import com.example.cargolink.presentation.viewmodel.TruckViewModel
+import com.example.cargolink.data.models.CargoDto
+import com.example.cargolink.data.models.TruckDto
+import com.example.cargolink.presentation.viewmodel.*
 import com.google.firebase.auth.FirebaseAuth
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -27,17 +27,31 @@ import com.google.firebase.auth.FirebaseAuth
 fun TruckDetailScreen(
     truckId: String = "",
     onNavigateBack: () -> Unit = {},
-    viewModel: TruckViewModel = viewModel()
+    onNavigateToEdit: (String) -> Unit = {},
+    viewModel: TruckViewModel = viewModel(),
+    cargoViewModel: CargoViewModel = viewModel(),
+    requestViewModel: TransportRequestViewModel = viewModel()
 ) {
     val truckDetailState by viewModel.truckDetailState.collectAsState()
     val truckActionState by viewModel.truckActionState.collectAsState()
+    val cargoListState by cargoViewModel.cargoListState.collectAsState()
+    val requestListState by requestViewModel.requestListState.collectAsState()
+    val requestActionState by requestViewModel.requestActionState.collectAsState()
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid
 
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showRequestDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(truckId) {
         if (truckId.isNotEmpty()) {
             viewModel.fetchTruckDetail(truckId)
+            requestViewModel.fetchCargoOwnerRequests()
+        }
+    }
+
+    LaunchedEffect(showRequestDialog) {
+        if (showRequestDialog) {
+            cargoViewModel.fetchMyCargo()
         }
     }
 
@@ -47,6 +61,18 @@ fun TruckDetailScreen(
             onNavigateBack()
         }
     }
+
+    LaunchedEffect(requestActionState) {
+        if (requestActionState is RequestActionState.Success) {
+            requestViewModel.resetActionState()
+            showRequestDialog = false
+        }
+    }
+
+    val existingRequest = (requestListState as? RequestListState.Success)?.requests?.find {
+        it.truckId == truckId && (it.status == "PENDING" || it.status == "ACCEPTED")
+    }
+    val hasExistingRequest = existingRequest != null
 
     if (showDeleteDialog) {
         AlertDialog(
@@ -71,6 +97,21 @@ fun TruckDetailScreen(
         )
     }
 
+    if (showRequestDialog && truckDetailState is TruckDetailState.Success) {
+        val truck = (truckDetailState as TruckDetailState.Success).truck
+        RequestBookingDialog(
+            truck = truck,
+            cargoListState = cargoListState,
+            actionState = requestActionState,
+            onDismiss = { showRequestDialog = false },
+            onSubmit = { selectedCargo, proposedPrice ->
+                requestViewModel.createTransportRequest(selectedCargo, truck, proposedPrice)
+            }
+        )
+    }
+
+    val isTruckOwner = (truckDetailState as? TruckDetailState.Success)?.truck?.ownerUid == currentUid
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -89,6 +130,60 @@ fun TruckDetailScreen(
                     }
                 }
             )
+        },
+        bottomBar = {
+            if (!isTruckOwner && truckDetailState is TruckDetailState.Success) {
+                val truck = (truckDetailState as TruckDetailState.Success).truck
+                Surface(
+                    tonalElevation = 8.dp,
+                    shadowElevation = 8.dp,
+                    color = MaterialTheme.colorScheme.surface
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Button(
+                            onClick = { showRequestDialog = true },
+                            enabled = !hasExistingRequest && truck.status.lowercase() == "available" && requestActionState !is RequestActionState.Loading,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (hasExistingRequest) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
+                                contentColor = if (hasExistingRequest) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary
+                            )
+                        ) {
+                            Text(
+                                text = when {
+                                    existingRequest?.status == "ACCEPTED" -> "Booking Accepted"
+                                    existingRequest?.status == "PENDING" -> "Request Pending"
+                                    else -> "Request Booking"
+                                },
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        if (hasExistingRequest) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "A booking request for this truck has already been submitted (${existingRequest?.status}).",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     ) { padding ->
         Box(
@@ -273,6 +368,15 @@ fun TruckDetailScreen(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 OutlinedButton(
+                                    onClick = { onNavigateToEdit(truck.id ?: "") },
+                                    enabled = truckActionState !is TruckActionState.Loading,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Edit Listing")
+                                }
+                                OutlinedButton(
                                     onClick = { showDeleteDialog = true },
                                     enabled = truckActionState !is TruckActionState.Loading,
                                     modifier = Modifier.weight(1f),
@@ -292,4 +396,119 @@ fun TruckDetailScreen(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RequestBookingDialog(
+    truck: TruckDto,
+    cargoListState: CargoListState,
+    actionState: RequestActionState,
+    onDismiss: () -> Unit,
+    onSubmit: (CargoDto, Double?) -> Unit
+) {
+    var selectedCargo by remember { mutableStateOf<CargoDto?>(null) }
+    var priceText by remember { mutableStateOf("") }
+    var expanded by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Request Transport Booking", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Selected Truck: ${truck.registrationNumber} (${truck.truckType})",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Text("Select Cargo Requirement:", style = MaterialTheme.typography.labelMedium)
+
+                when (cargoListState) {
+                    is CargoListState.Loading -> {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                    }
+                    is CargoListState.Error -> {
+                        Text(cargoListState.message, color = MaterialTheme.colorScheme.error)
+                    }
+                    is CargoListState.Success -> {
+                        if (cargoListState.cargoList.isEmpty()) {
+                            Text(
+                                text = "You have no active cargo requirements. Please post a cargo requirement first.",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        } else {
+                            ExposedDropdownMenuBox(
+                                expanded = expanded,
+                                onExpandedChange = { expanded = !expanded }
+                            ) {
+                                OutlinedTextField(
+                                    value = selectedCargo?.cargoType ?: "Choose cargo requirement",
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryEditable, true).fillMaxWidth()
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = expanded,
+                                    onDismissRequest = { expanded = false }
+                                ) {
+                                    cargoListState.cargoList.forEach { cargo ->
+                                        DropdownMenuItem(
+                                            text = { Text("${cargo.cargoType} (${cargo.weightKg} kg)") },
+                                            onClick = {
+                                                selectedCargo = cargo
+                                                expanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (selectedCargo != null) {
+                    OutlinedTextField(
+                        value = priceText,
+                        onValueChange = { priceText = it },
+                        label = { Text("Proposed Price (KES)") },
+                        placeholder = { Text(truck.price?.let { "%.0f".format(it) } ?: "Enter proposed price") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                if (actionState is RequestActionState.Error) {
+                    Text(
+                        text = actionState.message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (selectedCargo != null) {
+                        val price = priceText.replace(Regex("[^0-9.]"), "").toDoubleOrNull()
+                        onSubmit(selectedCargo!!, price)
+                    }
+                },
+                enabled = selectedCargo != null && actionState !is RequestActionState.Loading
+            ) {
+                if (actionState is RequestActionState.Loading) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary)
+                } else {
+                    Text("Submit Request")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = actionState !is RequestActionState.Loading) {
+                Text("Cancel")
+            }
+        }
+    )
 }

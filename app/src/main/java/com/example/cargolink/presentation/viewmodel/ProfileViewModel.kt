@@ -53,14 +53,15 @@ class ProfileViewModel : ViewModel() {
         }
     }
 
-    fun updateProfile(name: String, phone: String, participationType: String) {
+    fun updateProfile(name: String, phone: String, participationType: String, companyName: String? = null) {
         viewModelScope.launch {
             val currentState = _profileState.value
             if (currentState is ProfileState.Success) {
                 val updatedDto = currentState.user.copy(
                     name = name,
                     phone = phone,
-                    participationType = participationType
+                    participationType = participationType,
+                    companyName = companyName.takeIf { !it.isNullOrBlank() } ?: currentState.user.companyName
                 )
                 when (val result = userRepository.updateProfile(updatedDto)) {
                     is Resource.Success -> {

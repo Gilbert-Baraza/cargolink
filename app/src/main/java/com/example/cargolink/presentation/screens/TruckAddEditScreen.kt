@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cargolink.presentation.viewmodel.CargoActionState
+import com.example.cargolink.presentation.viewmodel.CargoDetailState
 import com.example.cargolink.presentation.viewmodel.CargoViewModel
 import com.example.cargolink.presentation.viewmodel.ProfileState
 import com.example.cargolink.presentation.viewmodel.ProfileViewModel
@@ -72,12 +73,17 @@ fun TruckAddEditScreen(
     var budget by remember { mutableStateOf("") }
 
     val truckDetailState by viewModel.truckDetailState.collectAsState()
+    val cargoDetailState by cargoViewModel.cargoDetailState.collectAsState()
     val truckActionState by viewModel.truckActionState.collectAsState()
     val cargoActionState by cargoViewModel.cargoActionState.collectAsState()
 
     LaunchedEffect(truckId) {
         if (!truckId.isNullOrEmpty() && truckId != "new") {
-            viewModel.fetchTruckDetail(truckId)
+            if (isCargoOwner) {
+                cargoViewModel.fetchCargoDetail(truckId)
+            } else {
+                viewModel.fetchTruckDetail(truckId)
+            }
         }
     }
 
@@ -93,6 +99,20 @@ fun TruckAddEditScreen(
             destination = truck.preferredDestination ?: ""
             askingPrice = truck.price?.let { "%.0f".format(it) } ?: ""
             notes = truck.description ?: ""
+        }
+    }
+
+    LaunchedEffect(cargoDetailState) {
+        if (cargoDetailState is CargoDetailState.Success) {
+            val cargo = (cargoDetailState as CargoDetailState.Success).cargo
+            cargoType = cargo.cargoType
+            pickupLocation = cargo.pickupLocation
+            destination = cargo.destination
+            cargoWeight = if (cargo.weightKg > 0) "${cargo.weightKg.toInt()} kg" else ""
+            availabilityDate = cargo.preferredDate ?: ""
+            budget = cargo.budget?.let { "%.0f".format(it) } ?: ""
+            notes = cargo.specialRequirements ?: ""
+            selectedTab = 1
         }
     }
 
@@ -152,7 +172,7 @@ fun TruckAddEditScreen(
             } else {
                 validationError = null
                 cargoViewModel.saveCargo(
-                    id = null,
+                    id = if (truckId == "new") null else truckId,
                     cargoType = trimmedCargoType,
                     weightKg = weightDouble,
                     pickupLocation = trimmedPickup,

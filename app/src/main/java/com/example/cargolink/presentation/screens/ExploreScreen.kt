@@ -375,17 +375,17 @@ fun TruckListingCard(truck: TruckSample, onClick: () -> Unit) {
                 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
-                        onClick = { /* TODO */ },
+                        onClick = onClick,
                         shape = RoundedCornerShape(20.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Text("Contact")
+                        Text("Details")
                     }
                     Button(
-                        onClick = { /* TODO */ },
+                        onClick = onClick,
                         shape = RoundedCornerShape(20.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
@@ -469,7 +469,7 @@ fun CargoListingCard(cargo: CargoSample, onClick: () -> Unit) {
                 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
-                        onClick = { /* TODO */ },
+                        onClick = onClick,
                         shape = RoundedCornerShape(20.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.primary
@@ -478,7 +478,7 @@ fun CargoListingCard(cargo: CargoSample, onClick: () -> Unit) {
                         Text("Details")
                     }
                     Button(
-                        onClick = { /* TODO */ },
+                        onClick = onClick,
                         shape = RoundedCornerShape(20.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,

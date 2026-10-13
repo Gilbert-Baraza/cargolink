@@ -12,17 +12,14 @@ service cloud.firestore {
 
     // User profiles collection
     match /users/{userId} {
-      // Users can only read their own profile
       allow read: if isOwner(userId);
 
-      // On creation, ensure user is creating their own profile with valid initial fields
       allow create: if isOwner(userId)
         && request.resource.data.firebaseUid == userId
         && request.resource.data.participationType in ['TRUCK_DRIVER', 'TRUCK_OPERATOR', 'CARGO_OWNER']
         && request.resource.data.name is string
         && request.resource.data.email is string;
 
-      // On update, prevent changes to protected authorization and system fields
       allow update: if isOwner(userId)
         && request.resource.data.firebaseUid == resource.data.firebaseUid
         && request.resource.data.participationType == resource.data.participationType
@@ -31,11 +28,9 @@ service cloud.firestore {
 
     // Truck listings collection
     match /trucks/{truckId} {
-      // Authenticated users can read available marketplace listings or their own listings (including inactive)
       allow read: if isAuthenticated()
         && (resource.data.status == 'available' || resource.data.ownerUid == request.auth.uid);
 
-      // On create, ownerUid must match authenticated user and valid payload values
       allow create: if isAuthenticated()
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.registrationNumber is string
@@ -45,26 +40,22 @@ service cloud.firestore {
         && request.resource.data.maxPayloadKg > 0
         && request.resource.data.status in ['available', 'inactive'];
 
-      // On update, ownerUid must match authenticated user and remain unchanged
       allow update: if isAuthenticated()
-        && resource.data.ownerUid == request.auth.uid
+        && (resource.data.ownerUid == request.auth.uid || (resource.data.status == 'available' && request.resource.data.status == 'inactive'))
         && request.resource.data.ownerUid == resource.data.ownerUid
         && request.resource.data.maxPayloadKg is number
         && request.resource.data.maxPayloadKg > 0
         && request.resource.data.status in ['available', 'inactive'];
 
-      // On delete, only the document owner can delete
       allow delete: if isAuthenticated()
         && resource.data.ownerUid == request.auth.uid;
     }
 
     // Cargo requirements collection
     match /cargo/{cargoId} {
-      // Authenticated users can read available marketplace cargo requirements or their own listings (including inactive)
       allow read: if isAuthenticated()
         && (resource.data.status == 'available' || resource.data.ownerUid == request.auth.uid);
 
-      // On create, ownerUid must match authenticated user and valid weight values
       allow create: if isAuthenticated()
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.cargoType is string
@@ -75,17 +66,63 @@ service cloud.firestore {
         && request.resource.data.pickupLocation.size() > 0
         && request.resource.data.status in ['available', 'inactive', 'booked'];
 
-      // On update, ownerUid must match authenticated user and remain unchanged
       allow update: if isAuthenticated()
-        && resource.data.ownerUid == request.auth.uid
+        && (resource.data.ownerUid == request.auth.uid || (resource.data.status == 'available' && request.resource.data.status == 'booked'))
         && request.resource.data.ownerUid == resource.data.ownerUid
         && request.resource.data.weightKg is number
         && request.resource.data.weightKg > 0
         && request.resource.data.status in ['available', 'inactive', 'booked'];
 
-      // On delete, only the document owner can delete
       allow delete: if isAuthenticated()
         && resource.data.ownerUid == request.auth.uid;
+    }
+
+    // Transport requests collection
+    match /transportRequests/{requestId} {
+      allow read: if isAuthenticated()
+        && (resource.data.cargoOwnerUid == request.auth.uid || resource.data.truckOwnerUid == request.auth.uid);
+
+      allow create: if isAuthenticated()
+        && (
+          (request.resource.data.initiatedBy == 'TRUCK_DRIVER' && request.resource.data.truckOwnerUid == request.auth.uid)
+          || (request.resource.data.initiatedBy == 'CARGO_OWNER' && request.resource.data.cargoOwnerUid == request.auth.uid)
+          || (!('initiatedBy' in request.resource.data) && request.resource.data.cargoOwnerUid == request.auth.uid)
+        )
+        && request.resource.data.cargoOwnerUid != request.resource.data.truckOwnerUid
+        && request.resource.data.status == 'PENDING'
+        && request.resource.data.cargoRequestId is string
+        && request.resource.data.cargoRequestId.size() > 0
+        && request.resource.data.truckId is string
+        && request.resource.data.truckId.size() > 0
+        && get(/databases/$(database)/documents/cargo/$(request.resource.data.cargoRequestId)).data.status == 'available'
+        && get(/databases/$(database)/documents/trucks/$(request.resource.data.truckId)).data.status == 'available';
+
+      allow update: if isAuthenticated()
+        && request.resource.data.cargoOwnerUid == resource.data.cargoOwnerUid
+        && request.resource.data.truckOwnerUid == resource.data.truckOwnerUid
+        && request.resource.data.cargoRequestId == resource.data.cargoRequestId
+        && request.resource.data.truckId == resource.data.truckId
+        && (
+          // Cargo Owner requests: Cargo owner can CANCEL, Driver can ACCEPT or REJECT
+          ((!('initiatedBy' in resource.data) || resource.data.initiatedBy == 'CARGO_OWNER')
+            && ((request.auth.uid == resource.data.cargoOwnerUid && resource.data.status == 'PENDING' && request.resource.data.status == 'CANCELLED')
+                || (request.auth.uid == resource.data.truckOwnerUid && resource.data.status == 'PENDING' && request.resource.data.status in ['ACCEPTED', 'REJECTED'])))
+          // Driver offers: Driver can CANCEL, Cargo owner can ACCEPT or REJECT
+          || (resource.data.initiatedBy == 'TRUCK_DRIVER'
+            && ((request.auth.uid == resource.data.truckOwnerUid && resource.data.status == 'PENDING' && request.resource.data.status == 'CANCELLED')
+                || (request.auth.uid == resource.data.cargoOwnerUid && resource.data.status == 'PENDING' && request.resource.data.status in ['ACCEPTED', 'REJECTED'])))
+          // Transit & Delivery transitions by Driver
+          || (request.auth.uid == resource.data.truckOwnerUid && resource.data.status == 'ACCEPTED' && request.resource.data.status == 'IN_TRANSIT')
+          || (request.auth.uid == resource.data.truckOwnerUid && resource.data.status == 'IN_TRANSIT' && request.resource.data.status == 'DELIVERED')
+          // Confirmation of Delivery Receipt by Cargo Owner
+          || (request.auth.uid == resource.data.cargoOwnerUid
+              && resource.data.status == 'DELIVERED'
+              && (!('isConfirmedByOwner' in resource.data) || resource.data.isConfirmedByOwner == false)
+              && request.resource.data.status == 'DELIVERED'
+              && request.resource.data.isConfirmedByOwner == true)
+        );
+
+      allow delete: if false;
     }
   }
 }
