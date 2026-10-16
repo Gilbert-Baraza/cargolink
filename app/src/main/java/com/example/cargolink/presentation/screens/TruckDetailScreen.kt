@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cargolink.data.models.CargoDto
+import com.example.cargolink.data.models.TransportRequestDto
 import com.example.cargolink.data.models.TruckDto
 import com.example.cargolink.presentation.viewmodel.*
 import com.google.firebase.auth.FirebaseAuth
@@ -28,9 +30,11 @@ fun TruckDetailScreen(
     truckId: String = "",
     onNavigateBack: () -> Unit = {},
     onNavigateToEdit: (String) -> Unit = {},
+    onNavigateToChat: (String) -> Unit = {},
     viewModel: TruckViewModel = viewModel(),
     cargoViewModel: CargoViewModel = viewModel(),
-    requestViewModel: TransportRequestViewModel = viewModel()
+    requestViewModel: TransportRequestViewModel = viewModel(),
+    chatViewModel: ChatViewModel = viewModel()
 ) {
     val truckDetailState by viewModel.truckDetailState.collectAsState()
     val truckActionState by viewModel.truckActionState.collectAsState()
@@ -125,6 +129,24 @@ fun TruckDetailScreen(
                     }
                 },
                 actions = {
+                    if (!isTruckOwner && truckDetailState is TruckDetailState.Success) {
+                        val truck = (truckDetailState as TruckDetailState.Success).truck
+                        IconButton(onClick = {
+                            val targetReq = existingRequest ?: TransportRequestDto(
+                                id = "trk_chat_${truck.id}",
+                                truckId = truck.id ?: "",
+                                cargoOwnerUid = currentUid ?: "",
+                                truckOwnerUid = truck.ownerUid,
+                                truckTitle = truck.registrationNumber,
+                                cargoTitle = "Inquiry: ${truck.registrationNumber}"
+                            )
+                            chatViewModel.openConversationByRequest(targetReq) { convId ->
+                                onNavigateToChat(convId)
+                            }
+                        }) {
+                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Chat with Driver")
+                        }
+                    }
                     IconButton(onClick = { /* Share */ }) {
                         Icon(Icons.Default.Share, contentDescription = "Share")
                     }
@@ -145,26 +167,55 @@ fun TruckDetailScreen(
                             .padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Button(
-                            onClick = { showRequestDialog = true },
-                            enabled = !hasExistingRequest && truck.status.lowercase() == "available" && requestActionState !is RequestActionState.Loading,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp),
-                            shape = RoundedCornerShape(24.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (hasExistingRequest) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
-                                contentColor = if (hasExistingRequest) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary
-                            )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text(
-                                text = when {
-                                    existingRequest?.status == "ACCEPTED" -> "Booking Accepted"
-                                    existingRequest?.status == "PENDING" -> "Request Pending"
-                                    else -> "Request Booking"
+                            OutlinedButton(
+                                onClick = {
+                                    val targetReq = existingRequest ?: TransportRequestDto(
+                                        id = "trk_chat_${truck.id}",
+                                        truckId = truck.id ?: "",
+                                        cargoOwnerUid = currentUid ?: "",
+                                        truckOwnerUid = truck.ownerUid,
+                                        truckTitle = truck.registrationNumber,
+                                        cargoTitle = "Inquiry: ${truck.registrationNumber}"
+                                    )
+                                    chatViewModel.openConversationByRequest(targetReq) { convId ->
+                                        onNavigateToChat(convId)
+                                    }
                                 },
-                                fontWeight = FontWeight.Bold
-                            )
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(48.dp),
+                                shape = RoundedCornerShape(24.dp)
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Chat Driver", fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = { showRequestDialog = true },
+                                enabled = !hasExistingRequest && truck.status.lowercase() == "available" && requestActionState !is RequestActionState.Loading,
+                                modifier = Modifier
+                                    .weight(1.2f)
+                                    .height(48.dp),
+                                shape = RoundedCornerShape(24.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (hasExistingRequest) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
+                                    contentColor = if (hasExistingRequest) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary
+                                )
+                            ) {
+                                Text(
+                                    text = when {
+                                        existingRequest?.status == "ACCEPTED" -> "Booking Accepted"
+                                        existingRequest?.status == "PENDING" -> "Request Pending"
+                                        else -> "Request Booking"
+                                    },
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
 
                         if (hasExistingRequest) {

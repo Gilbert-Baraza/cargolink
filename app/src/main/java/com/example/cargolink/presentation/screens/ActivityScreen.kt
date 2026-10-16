@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cargolink.data.models.TransportRequestDto
+import com.example.cargolink.presentation.viewmodel.ChatViewModel
 import com.example.cargolink.presentation.viewmodel.RequestActionState
 import com.example.cargolink.presentation.viewmodel.RequestListState
 import com.example.cargolink.presentation.viewmodel.TransportRequestViewModel
@@ -27,7 +29,11 @@ import com.example.cargolink.presentation.viewmodel.TransportRequestViewModel
 fun ActivityScreen(
     participationType: String? = null,
     onNavigateToDetails: (String) -> Unit = {},
-    viewModel: TransportRequestViewModel = viewModel()
+    onNavigateToChat: (String) -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
+    unreadCount: Int = 0,
+    viewModel: TransportRequestViewModel = viewModel(),
+    chatViewModel: ChatViewModel = viewModel()
 ) {
     val isDriver = participationType == "TRUCK_DRIVER" || participationType == "TRUCK_OPERATOR"
     val requestListState by viewModel.requestListState.collectAsState()
@@ -52,6 +58,12 @@ fun ActivityScreen(
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold
                         )
+                    )
+                },
+                actions = {
+                    NotificationIconButton(
+                        unreadCount = unreadCount,
+                        onClick = onNavigateToNotifications
                     )
                 }
             )
@@ -185,6 +197,11 @@ fun ActivityScreen(
                                         isDriver = isDriver,
                                         isActionLoading = requestActionState is RequestActionState.Loading,
                                         onClick = { onNavigateToDetails(request.id ?: "") },
+                                        onChat = {
+                                            chatViewModel.openConversationByRequest(request) { convId ->
+                                                onNavigateToChat(convId)
+                                            }
+                                        },
                                         onAccept = { viewModel.acceptRequest(request) },
                                         onReject = { viewModel.rejectRequest(request) },
                                         onCancel = { viewModel.cancelRequest(request) }
@@ -205,6 +222,7 @@ fun RequestItemCard(
     isDriver: Boolean,
     isActionLoading: Boolean,
     onClick: () -> Unit = {},
+    onChat: () -> Unit = {},
     onAccept: () -> Unit,
     onReject: () -> Unit,
     onCancel: () -> Unit
@@ -239,7 +257,18 @@ fun RequestItemCard(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
-                RequestStatusChip(request.status, request.isConfirmedByOwner)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onChat, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Chat,
+                            contentDescription = "Chat",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    RequestStatusChip(request.status, request.isConfirmedByOwner)
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))

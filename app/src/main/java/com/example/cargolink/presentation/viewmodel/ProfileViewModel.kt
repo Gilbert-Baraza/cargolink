@@ -13,7 +13,12 @@ import kotlinx.coroutines.launch
 
 sealed class ProfileState {
     object Loading : ProfileState()
-    data class Success(val user: UserDto) : ProfileState()
+    data class Success(
+        val user: UserDto,
+        val activeListingsCount: Int = 0,
+        val completedJobsCount: Int = 0,
+        val memberSinceYear: String = "2024"
+    ) : ProfileState()
     data class Error(val message: String) : ProfileState()
 }
 
@@ -39,8 +44,17 @@ class ProfileViewModel : ViewModel() {
             _profileState.value = ProfileState.Loading
             when (val result = userRepository.getProfile(uid)) {
                 is Resource.Success -> {
-                    if (result.data != null) {
-                        _profileState.value = ProfileState.Success(result.data)
+                    val user = result.data
+                    if (user != null) {
+                        val isCargoOwner = user.participationType == "CARGO_OWNER"
+                        val (activeCount, completedCount) = userRepository.getUserMetrics(uid, isCargoOwner)
+                        val year = user.createdAt?.take(4) ?: "2024"
+                        _profileState.value = ProfileState.Success(
+                            user = user,
+                            activeListingsCount = activeCount,
+                            completedJobsCount = completedCount,
+                            memberSinceYear = year
+                        )
                     } else {
                         _profileState.value = ProfileState.Error("Profile data is empty")
                     }
@@ -57,16 +71,21 @@ class ProfileViewModel : ViewModel() {
         viewModelScope.launch {
             val currentState = _profileState.value
             if (currentState is ProfileState.Success) {
+                val trimmedName = name.trim()
+                val trimmedPhone = phone.trim()
+                val trimmedRole = participationType.trim()
+                val trimmedCompany = companyName?.trim()
+
                 val updatedDto = currentState.user.copy(
-                    name = name,
-                    phone = phone,
-                    participationType = participationType,
-                    companyName = companyName.takeIf { !it.isNullOrBlank() } ?: currentState.user.companyName
+                    name = trimmedName,
+                    phone = trimmedPhone,
+                    participationType = trimmedRole,
+                    companyName = trimmedCompany.takeIf { !it.isNullOrBlank() } ?: currentState.user.companyName
                 )
                 when (val result = userRepository.updateProfile(updatedDto)) {
                     is Resource.Success -> {
                         if (result.data != null) {
-                            _profileState.value = ProfileState.Success(result.data)
+                            fetchProfile()
                         }
                     }
                     is Resource.Error -> {

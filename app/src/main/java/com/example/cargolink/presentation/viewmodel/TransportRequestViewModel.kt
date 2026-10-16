@@ -35,7 +35,26 @@ sealed class RequestDetailState {
 
 class TransportRequestViewModel : ViewModel() {
     private val repository = TransportRequestRepository()
+    private val notificationRepository = com.example.cargolink.data.repository.NotificationRepository()
     private val auth by lazy { FirebaseAuth.getInstance() }
+
+    private fun sendNotif(recipientUid: String, title: String, body: String, eventType: String, targetId: String) {
+        val senderUid = auth.currentUser?.uid ?: return
+        if (recipientUid.isBlank() || recipientUid == senderUid) return
+        viewModelScope.launch {
+            notificationRepository.createNotification(
+                com.example.cargolink.data.models.NotificationDto(
+                    recipientUid = recipientUid,
+                    senderUid = senderUid,
+                    title = title,
+                    body = body,
+                    eventType = eventType,
+                    targetId = targetId,
+                    isRead = false
+                )
+            )
+        }
+    }
 
     private val _requestListState = MutableStateFlow<RequestListState>(RequestListState.Loading)
     val requestListState: StateFlow<RequestListState> = _requestListState.asStateFlow()
@@ -138,7 +157,15 @@ class TransportRequestViewModel : ViewModel() {
 
             when (val result = repository.createTransportRequest(request)) {
                 is Resource.Success -> {
+                    val createdId = result.data ?: ""
                     _requestActionState.value = RequestActionState.Success
+                    sendNotif(
+                        recipientUid = truck.ownerUid,
+                        title = "New Booking Request",
+                        body = "You received a new booking request for ${cargo.cargoType}.",
+                        eventType = "BOOKING_REQUEST",
+                        targetId = createdId
+                    )
                     fetchCargoOwnerRequests()
                 }
                 is Resource.Error -> {
@@ -201,7 +228,15 @@ class TransportRequestViewModel : ViewModel() {
 
             when (val result = repository.createTransportRequest(request)) {
                 is Resource.Success -> {
+                    val createdId = result.data ?: ""
                     _requestActionState.value = RequestActionState.Success
+                    sendNotif(
+                        recipientUid = cargo.ownerUid,
+                        title = "New Transport Offer",
+                        body = "You received a new offer for ${cargo.cargoType}.",
+                        eventType = "BOOKING_REQUEST",
+                        targetId = createdId
+                    )
                     fetchTruckOwnerRequests()
                 }
                 is Resource.Error -> {
@@ -232,6 +267,13 @@ class TransportRequestViewModel : ViewModel() {
             when (val result = repository.acceptTransportRequest(request)) {
                 is Resource.Success -> {
                     _requestActionState.value = RequestActionState.Success
+                    sendNotif(
+                        recipientUid = if (isDriverOffer) request.truckOwnerUid else request.cargoOwnerUid,
+                        title = "Booking Accepted!",
+                        body = "Booking for ${request.cargoTitle} has been accepted.",
+                        eventType = "BOOKING_ACCEPTED",
+                        targetId = request.id ?: ""
+                    )
                     if (isDriverOffer) fetchCargoOwnerRequests() else fetchTruckOwnerRequests()
                 }
                 is Resource.Error -> {
@@ -262,6 +304,13 @@ class TransportRequestViewModel : ViewModel() {
             when (val result = repository.updateRequestStatus(request.id ?: "", "REJECTED")) {
                 is Resource.Success -> {
                     _requestActionState.value = RequestActionState.Success
+                    sendNotif(
+                        recipientUid = if (isDriverOffer) request.truckOwnerUid else request.cargoOwnerUid,
+                        title = "Booking Rejected",
+                        body = "Booking request for ${request.cargoTitle} was rejected.",
+                        eventType = "BOOKING_REJECTED",
+                        targetId = request.id ?: ""
+                    )
                     if (isDriverOffer) fetchCargoOwnerRequests() else fetchTruckOwnerRequests()
                 }
                 is Resource.Error -> {
@@ -292,11 +341,14 @@ class TransportRequestViewModel : ViewModel() {
             when (val result = repository.updateRequestStatus(request.id ?: "", "CANCELLED")) {
                 is Resource.Success -> {
                     _requestActionState.value = RequestActionState.Success
+                    sendNotif(
+                        recipientUid = if (isDriverOffer) request.cargoOwnerUid else request.truckOwnerUid,
+                        title = "Booking Cancelled",
+                        body = "Booking for ${request.cargoTitle} was cancelled.",
+                        eventType = "BOOKING_CANCELLED",
+                        targetId = request.id ?: ""
+                    )
                     if (isDriverOffer) fetchTruckOwnerRequests() else fetchCargoOwnerRequests()
-                }
-                is Resource.Success -> {
-                    _requestActionState.value = RequestActionState.Success
-                    fetchCargoOwnerRequests()
                 }
                 is Resource.Error -> {
                     _requestActionState.value = RequestActionState.Error(result.message ?: "Failed to cancel request")
@@ -358,6 +410,13 @@ class TransportRequestViewModel : ViewModel() {
             when (val result = repository.updateRequestLifecycleStatus(request.id ?: "", "ACCEPTED", "IN_TRANSIT")) {
                 is Resource.Success -> {
                     _requestActionState.value = RequestActionState.Success
+                    sendNotif(
+                        recipientUid = request.cargoOwnerUid,
+                        title = "Shipment In Transit",
+                        body = "Your shipment ${request.cargoTitle} is now on the way.",
+                        eventType = "SHIPMENT_IN_TRANSIT",
+                        targetId = request.id ?: ""
+                    )
                     fetchRequestDetail(request.id ?: "")
                 }
                 is Resource.Error -> {
@@ -390,6 +449,13 @@ class TransportRequestViewModel : ViewModel() {
             when (val result = repository.updateRequestLifecycleStatus(request.id ?: "", "IN_TRANSIT", "DELIVERED")) {
                 is Resource.Success -> {
                     _requestActionState.value = RequestActionState.Success
+                    sendNotif(
+                        recipientUid = request.cargoOwnerUid,
+                        title = "Shipment Delivered",
+                        body = "Your shipment ${request.cargoTitle} has been delivered. Please confirm receipt.",
+                        eventType = "SHIPMENT_DELIVERED",
+                        targetId = request.id ?: ""
+                    )
                     fetchRequestDetail(request.id ?: "")
                 }
                 is Resource.Error -> {
@@ -427,6 +493,13 @@ class TransportRequestViewModel : ViewModel() {
             when (val result = repository.confirmDeliveryReceipt(request.id ?: "", currentUid)) {
                 is Resource.Success -> {
                     _requestActionState.value = RequestActionState.Success
+                    sendNotif(
+                        recipientUid = request.truckOwnerUid,
+                        title = "Delivery Confirmed",
+                        body = "The cargo owner confirmed delivery receipt for ${request.cargoTitle}.",
+                        eventType = "DELIVERY_CONFIRMED",
+                        targetId = request.id ?: ""
+                    )
                     (_requestDetailState.value as? RequestDetailState.Success)?.let { currentState ->
                         _requestDetailState.value = RequestDetailState.Success(
                             currentState.request.copy(

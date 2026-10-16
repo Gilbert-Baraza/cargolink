@@ -50,23 +50,23 @@ fun ProfileScreen(
         }
     }
 
-    val navyColor = Color(0xFF0D2845)
-    val goldAccent = Color(0xFFFFB300)
-    val goldBorder = Color(0xFFB57A25)
-    val lightBgColor = Color(0xFFF4F6F9)
-    val textDark = Color(0xFF212529)
-    val textMuted = Color(0xFF495057)
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val bgColor = MaterialTheme.colorScheme.background
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(lightBgColor)
+            .background(bgColor)
     ) {
         when (val state = profileState) {
             is ProfileState.Loading -> {
                 CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center),
-                    color = MaterialTheme.colorScheme.primary
+                    color = primaryColor
                 )
             }
             is ProfileState.Error -> {
@@ -95,10 +95,10 @@ fun ProfileScreen(
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                 ) {
-                    // 1. TOP NAVY HEADER CARD
+                    // 1. TOP HEADER CARD WITH APP THEME
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        color = navyColor,
+                        color = primaryColor,
                         shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
                     ) {
                         Column(
@@ -114,13 +114,13 @@ fun ProfileScreen(
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
-                                    color = Color.White.copy(alpha = 0.2f),
+                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f),
                                     modifier = Modifier.size(38.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.LocalShipping,
                                         contentDescription = "Logo",
-                                        tint = goldAccent,
+                                        tint = secondaryColor,
                                         modifier = Modifier.padding(6.dp)
                                     )
                                 }
@@ -133,90 +133,62 @@ fun ProfileScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Circular Avatar with Amber Ring
                                 Box(
                                     modifier = Modifier
                                         .size(80.dp)
                                         .clip(CircleShape)
-                                        .background(Color.White.copy(alpha = 0.25f))
-                                        .border(3.dp, goldAccent, CircleShape),
+                                        .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f))
+                                        .border(3.dp, secondaryColor, CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Person,
                                         contentDescription = "Profile Avatar",
                                         modifier = Modifier.size(48.dp),
-                                        tint = Color.White
+                                        tint = MaterialTheme.colorScheme.onPrimary
                                     )
                                 }
 
                                 Spacer(modifier = Modifier.width(16.dp))
 
-                                // Name and Role Info
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = user.name.ifBlank { "ARTHUR KIBET" }.uppercase(),
+                                        text = user.name.ifBlank { "USER" }.uppercase(),
                                         style = MaterialTheme.typography.titleLarge,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White,
+                                        color = MaterialTheme.colorScheme.onPrimary,
                                         fontSize = 20.sp
                                     )
                                     Text(
-                                        text = user.participationType.replace("_", " ").uppercase().ifBlank { "LOGISTICS MANAGER" },
+                                        text = user.participationType.replace("_", " ").uppercase().ifBlank { "CARGOLINK MEMBER" },
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = Color.White.copy(alpha = 0.95f),
+                                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.95f),
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Text(
-                                        text = user.companyName ?: "KIBET & SONS FREIGHT",
+                                        text = user.companyName ?: user.ownerKind ?: "Independent Partner",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White.copy(alpha = 0.90f)
-                                    )
-                                }
-
-                                // Rating Badge
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = "4.9",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Icon(
-                                            imageVector = Icons.Default.Star,
-                                            contentDescription = "Rating",
-                                            tint = goldAccent,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                    Text(
-                                        text = "256 reviews",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White.copy(alpha = 0.90f),
-                                        fontSize = 11.sp
+                                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
                                     )
                                 }
                             }
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // Verification Badges Row (High Contrast Badges)
+                            // Verification Badges Row
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                VerificationBadge(label = "ID VERIFIED", iconColor = Color(0xFF1E88E5))
-                                VerificationBadge(label = "BUSINESS VERIFIED", iconColor = Color(0xFF1E88E5))
-                                VerificationBadge(label = "PHONE VERIFIED", iconColor = Color(0xFFE65100))
+                                VerificationBadge(label = "ACCOUNT ACTIVE")
+                                VerificationBadge(label = "EMAIL VERIFIED")
                             }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // 2. METRICS CARDS ROW (3 Overlapping Summary Cards)
+                    // 2. REAL METRICS CARDS ROW (From Firebase Data)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -225,20 +197,20 @@ fun ProfileScreen(
                     ) {
                         MetricCard(
                             title = "ACTIVE LISTINGS",
-                            value = "12",
+                            value = state.activeListingsCount.toString(),
                             subtitle = if (user.participationType == "CARGO_OWNER") "Cargo" else "Trucks",
                             modifier = Modifier.weight(1f)
                         )
                         MetricCard(
                             title = "JOBS COMPLETED",
-                            value = "1,542",
-                            subtitle = null,
+                            value = state.completedJobsCount.toString(),
+                            subtitle = "Shipments",
                             modifier = Modifier.weight(1f)
                         )
                         MetricCard(
                             title = "MEMBER SINCE",
-                            value = "2018",
-                            subtitle = null,
+                            value = state.memberSinceYear,
+                            subtitle = "Year",
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -246,128 +218,63 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(20.dp))
 
                     if (!isEditing) {
-                        // 3. BUSINESS DETAILS SECTION
+                        // 3. REAL ACCOUNT & BUSINESS DETAILS SECTION
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp),
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            colors = CardDefaults.cardColors(containerColor = surfaceColor),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text(
-                                    text = "BUSINESS DETAILS",
+                                    text = "ACCOUNT & BUSINESS DETAILS",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
-                                    color = navyColor
+                                    color = primaryColor
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
 
                                 DetailRow(
-                                    icon = Icons.Default.LocationOn,
-                                    label = "Business Address",
-                                    value = "123 Enterprise Rd, Nairobi, Kenya"
+                                    icon = Icons.Default.Person,
+                                    label = "Full Name",
+                                    value = user.name.ifBlank { "Not provided" }
                                 )
-                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray.copy(alpha = 0.4f))
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
                                 DetailRow(
-                                    icon = Icons.Default.Description,
-                                    label = "Company Registration",
-                                    value = user.companyName ?: "K&S-FREIGHT-NAIROBI"
+                                    icon = Icons.Default.Business,
+                                    label = "Company / Registration",
+                                    value = user.companyName ?: user.ownerKind ?: "Independent Partner"
                                 )
-                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray.copy(alpha = 0.4f))
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
                                 DetailRow(
                                     icon = Icons.Default.Email,
                                     label = "Contact Email",
-                                    value = user.email.ifBlank { "arthur.k@kibetandsons.co.ke" }
+                                    value = user.email.ifBlank { "Not provided" }
                                 )
-                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray.copy(alpha = 0.4f))
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
                                 DetailRow(
                                     icon = Icons.Default.Phone,
                                     label = "Contact Phone",
-                                    value = user.phone.ifBlank { "+254 712 345 678" }
+                                    value = user.phone.ifBlank { "Not provided" }
                                 )
-                            }
-                        }
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // 4. VEHICLE FLEET SECTION
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = if (user.participationType == "CARGO_OWNER") "ACTIVE SHIPMENTS" else "VEHICLE FLEET",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = navyColor
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                        FleetItem(count = "4x", type = "Flatbed")
-                                        FleetItem(count = "2x", type = "Tanker")
-                                        FleetItem(count = "2x", type = "Refrigerated")
-                                    }
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text("8 Trucks", fontWeight = FontWeight.Bold, color = navyColor)
-                                        Text("Active Fleet", style = MaterialTheme.typography.labelSmall, color = textMuted, fontWeight = FontWeight.SemiBold)
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // 5. RECENT REVIEWS SECTION
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = "RECENT REVIEWS",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = navyColor
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                ReviewItem(
-                                    reviewerName = "Arthur: cargo owner",
-                                    rating = "5",
-                                    comment = "Excellent service, on-time delivery. Reliable partner."
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                ReviewItem(
-                                    reviewerName = "Arthur: another partner",
-                                    rating = "5",
-                                    comment = "Professional and easy to work with. Handled fragile cargo perfectly."
+                                DetailRow(
+                                    icon = Icons.Default.Badge,
+                                    label = "Participation Role",
+                                    value = user.participationType.replace("_", " ").uppercase()
                                 )
                             }
                         }
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        // 6. ACTION BUTTONS (EDIT PROFILE / SETTINGS / LOGOUT)
+                        // 4. ACTION BUTTONS (EDIT PROFILE / SETTINGS / LOGOUT)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -380,8 +287,8 @@ fun ProfileScreen(
                                     .weight(1f)
                                     .height(48.dp),
                                 shape = RoundedCornerShape(24.dp),
-                                border = BorderStroke(1.5.dp, goldBorder),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = navyColor)
+                                border = BorderStroke(1.5.dp, secondaryColor),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = primaryColor)
                             ) {
                                 Text("EDIT PROFILE", fontWeight = FontWeight.Bold)
                             }
@@ -392,8 +299,8 @@ fun ProfileScreen(
                                     .weight(1f)
                                     .height(48.dp),
                                 shape = RoundedCornerShape(24.dp),
-                                border = BorderStroke(1.5.dp, navyColor),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = navyColor)
+                                border = BorderStroke(1.5.dp, primaryColor),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = primaryColor)
                             ) {
                                 Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -412,7 +319,7 @@ fun ProfileScreen(
                             Text(
                                 text = "LOGOUT",
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFFD32F2F),
+                                color = MaterialTheme.colorScheme.error,
                                 style = MaterialTheme.typography.titleMedium
                             )
                         }
@@ -423,7 +330,7 @@ fun ProfileScreen(
                                 .fillMaxWidth()
                                 .padding(16.dp),
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            colors = CardDefaults.cardColors(containerColor = surfaceColor),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
                             Column(modifier = Modifier.padding(20.dp)) {
@@ -431,63 +338,39 @@ fun ProfileScreen(
                                     text = "Edit Profile Details",
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
-                                    color = navyColor
+                                    color = primaryColor
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
 
                                 OutlinedTextField(
                                     value = name,
                                     onValueChange = { name = it },
-                                    label = { Text("Full Name", color = textMuted) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = textDark,
-                                        unfocusedTextColor = textDark,
-                                        focusedBorderColor = navyColor,
-                                        unfocusedBorderColor = Color.Gray
-                                    )
+                                    label = { Text("Full Name") },
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
 
                                 OutlinedTextField(
                                     value = phone,
                                     onValueChange = { phone = it },
-                                    label = { Text("Phone Number", color = textMuted) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = textDark,
-                                        unfocusedTextColor = textDark,
-                                        focusedBorderColor = navyColor,
-                                        unfocusedBorderColor = Color.Gray
-                                    )
+                                    label = { Text("Phone Number") },
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
 
                                 OutlinedTextField(
                                     value = companyName,
                                     onValueChange = { companyName = it },
-                                    label = { Text("Company Name / Registration", color = textMuted) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = textDark,
-                                        unfocusedTextColor = textDark,
-                                        focusedBorderColor = navyColor,
-                                        unfocusedBorderColor = Color.Gray
-                                    )
+                                    label = { Text("Company Name / Registration") },
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
 
                                 OutlinedTextField(
                                     value = participationType,
                                     onValueChange = { participationType = it },
-                                    label = { Text("Role (TRUCK_DRIVER / CARGO_OWNER)", color = textMuted) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = textDark,
-                                        unfocusedTextColor = textDark,
-                                        focusedBorderColor = navyColor,
-                                        unfocusedBorderColor = Color.Gray
-                                    )
+                                    label = { Text("Role (TRUCK_DRIVER / CARGO_OWNER)") },
+                                    modifier = Modifier.fillMaxWidth()
                                 )
 
                                 Spacer(modifier = Modifier.height(24.dp))
@@ -499,22 +382,27 @@ fun ProfileScreen(
                                     OutlinedButton(
                                         onClick = { isEditing = false },
                                         modifier = Modifier.weight(1f),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = navyColor)
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = primaryColor)
                                     ) {
-                                        Text("Cancel", color = navyColor, fontWeight = FontWeight.Bold)
+                                        Text("Cancel", fontWeight = FontWeight.Bold)
                                     }
                                     Button(
                                         onClick = {
-                                            viewModel.updateProfile(name, phone, participationType, companyName)
+                                            viewModel.updateProfile(
+                                                name = name.trim(),
+                                                phone = phone.trim(),
+                                                participationType = participationType.trim(),
+                                                companyName = companyName.trim()
+                                            )
                                             isEditing = false
                                         },
                                         modifier = Modifier.weight(1f),
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = navyColor,
-                                            contentColor = Color.White
+                                            containerColor = primaryColor,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
                                         )
                                     ) {
-                                        Text("Save Changes", color = Color.White, fontWeight = FontWeight.Bold)
+                                        Text("Save Changes", fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -527,10 +415,10 @@ fun ProfileScreen(
 }
 
 @Composable
-fun VerificationBadge(label: String, iconColor: Color) {
+fun VerificationBadge(label: String) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = Color.White
+        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -539,14 +427,14 @@ fun VerificationBadge(label: String, iconColor: Color) {
             Icon(
                 imageVector = Icons.Default.CheckCircle,
                 contentDescription = null,
-                tint = iconColor,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(13.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF0D2845),
+                color = MaterialTheme.colorScheme.primary,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -564,8 +452,8 @@ fun MetricCard(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFB57A25)),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary),
         shadowElevation = 2.dp
     ) {
         Column(
@@ -577,7 +465,7 @@ fun MetricCard(
             Text(
                 text = title,
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF343A40),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -586,14 +474,14 @@ fun MetricCard(
                 text = value,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF0D2845),
+                color = MaterialTheme.colorScheme.primary,
                 fontSize = 22.sp
             )
             if (!subtitle.isNullOrBlank()) {
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF495057),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -611,7 +499,7 @@ fun DetailRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: Stri
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = Color(0xFFB57A25),
+            tint = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.size(20.dp)
         )
         Spacer(modifier = Modifier.width(12.dp))
@@ -619,100 +507,15 @@ fun DetailRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: Stri
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF495057),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Medium
             )
             Text(
                 text = value,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF0D2845)
+                color = MaterialTheme.colorScheme.onSurface
             )
-        }
-    }
-}
-
-@Composable
-fun FleetItem(count: String, type: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(
-            imageVector = Icons.Default.LocalShipping,
-            contentDescription = null,
-            tint = Color(0xFF0D2845),
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(text = "$count $type", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF212529))
-    }
-}
-
-@Composable
-fun ReviewItem(reviewerName: String, rating: String, comment: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = Color(0xFFF8F9FA),
-        border = BorderStroke(1.dp, Color(0xFFDEE2E6))
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                modifier = Modifier.size(36.dp),
-                shape = CircleShape,
-                color = Color(0xFF0D2845)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = reviewerName,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0D2845)
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        repeat(5) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = null,
-                                tint = Color(0xFFFFB300),
-                                modifier = Modifier.size(12.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = rating,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF212529)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = comment,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF212529),
-                    fontWeight = FontWeight.Normal
-                )
-            }
         }
     }
 }

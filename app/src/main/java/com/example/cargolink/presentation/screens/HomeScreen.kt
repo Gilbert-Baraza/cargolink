@@ -36,7 +36,9 @@ fun HomeScreen(
     onViewMyListings: () -> Unit = {},
     onNavigateToDetails: (String) -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
-    onNavigateToExplore: () -> Unit = {}
+    onNavigateToExplore: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
+    unreadCount: Int = 0
 ) {
     Scaffold(
         topBar = {
@@ -50,9 +52,10 @@ fun HomeScreen(
                     )
                 },
                 actions = {
-                    IconButton(onClick = { /* TODO */ }) {
-                        Icon(Icons.Default.Notifications, contentDescription = "Notifications")
-                    }
+                    NotificationIconButton(
+                        unreadCount = unreadCount,
+                        onClick = onNavigateToNotifications
+                    )
                     Box(
                         modifier = Modifier
                             .padding(end = 16.dp, start = 8.dp)
@@ -263,7 +266,7 @@ fun HomeScreen(
                                 StatusChip("ACTIVE", Color(0xFF4CAF50))
                             }
                         },
-                        modifier = Modifier.weight(1f).clickable { onPostCargo() } // Navigates to My Listings for owners
+                        modifier = Modifier.weight(1f).clickable { onViewMyListings() }
                     )
                     MarketplaceCard(
                         title = "Find Trucks",

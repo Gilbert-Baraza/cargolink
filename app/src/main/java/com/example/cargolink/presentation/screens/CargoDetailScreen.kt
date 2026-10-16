@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,6 +18,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cargolink.data.models.CargoDto
+import com.example.cargolink.data.models.TransportRequestDto
 import com.example.cargolink.data.models.TruckDto
 import com.example.cargolink.presentation.viewmodel.*
 import com.example.cargolink.ui.theme.CargoLinkTheme
@@ -28,10 +30,12 @@ fun CargoDetailScreen(
     cargoId: String = "",
     onNavigateBack: () -> Unit = {},
     onNavigateToEdit: (String) -> Unit = {},
+    onNavigateToChat: (String) -> Unit = {},
     viewModel: CargoViewModel = viewModel(),
     requestViewModel: TransportRequestViewModel = viewModel(),
     truckViewModel: TruckViewModel = viewModel(),
-    profileViewModel: ProfileViewModel = viewModel()
+    profileViewModel: ProfileViewModel = viewModel(),
+    chatViewModel: ChatViewModel = viewModel()
 ) {
     val cargoDetailState by viewModel.cargoDetailState.collectAsState()
     val cargoActionState by viewModel.cargoActionState.collectAsState()
@@ -125,6 +129,27 @@ fun CargoDetailScreen(
                     }
                 },
                 actions = {
+                    if (cargoDetailState is CargoDetailState.Success) {
+                        val cargo = (cargoDetailState as CargoDetailState.Success).cargo
+                        val isOwner = currentUid != null && currentUid == cargo.ownerUid
+                        if (!isOwner && isDriver) {
+                            IconButton(onClick = {
+                                val targetReq = existingOffer ?: TransportRequestDto(
+                                    id = "cargo_chat_${cargo.id}",
+                                    cargoRequestId = cargo.id ?: "",
+                                    cargoOwnerUid = cargo.ownerUid,
+                                    truckOwnerUid = currentUid ?: "",
+                                    cargoTitle = cargo.cargoType,
+                                    truckTitle = "Inquiry: ${cargo.cargoType}"
+                                )
+                                chatViewModel.openConversationByRequest(targetReq) { convId ->
+                                    onNavigateToChat(convId)
+                                }
+                            }) {
+                                Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Chat with Cargo Owner")
+                            }
+                        }
+                    }
                     IconButton(onClick = { /* Share */ }) {
                         Icon(Icons.Default.Share, contentDescription = "Share")
                     }
@@ -148,26 +173,55 @@ fun CargoDetailScreen(
                                 .padding(16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Button(
-                                onClick = { showOfferDialog = true },
-                                enabled = !hasExistingOffer && cargo.status.lowercase() == "available" && requestActionState !is RequestActionState.Loading,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp),
-                                shape = RoundedCornerShape(24.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (hasExistingOffer) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
-                                    contentColor = if (hasExistingOffer) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary
-                                )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Text(
-                                    text = when {
-                                        existingOffer?.status == "ACCEPTED" -> "Offer Accepted"
-                                        existingOffer?.status == "PENDING" -> "Offer Pending"
-                                        else -> "Make Offer"
+                                OutlinedButton(
+                                    onClick = {
+                                        val targetReq = existingOffer ?: TransportRequestDto(
+                                            id = "cargo_chat_${cargo.id}",
+                                            cargoRequestId = cargo.id ?: "",
+                                            cargoOwnerUid = cargo.ownerUid,
+                                            truckOwnerUid = currentUid ?: "",
+                                            cargoTitle = cargo.cargoType,
+                                            truckTitle = "Inquiry: ${cargo.cargoType}"
+                                        )
+                                        chatViewModel.openConversationByRequest(targetReq) { convId ->
+                                            onNavigateToChat(convId)
+                                        }
                                     },
-                                    fontWeight = FontWeight.Bold
-                                )
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    shape = RoundedCornerShape(24.dp)
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Chat Owner", fontWeight = FontWeight.Bold)
+                                }
+
+                                Button(
+                                    onClick = { showOfferDialog = true },
+                                    enabled = !hasExistingOffer && cargo.status.lowercase() == "available" && requestActionState !is RequestActionState.Loading,
+                                    modifier = Modifier
+                                        .weight(1.2f)
+                                        .height(48.dp),
+                                    shape = RoundedCornerShape(24.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (hasExistingOffer) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
+                                        contentColor = if (hasExistingOffer) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary
+                                    )
+                                ) {
+                                    Text(
+                                        text = when {
+                                            existingOffer?.status == "ACCEPTED" -> "Offer Accepted"
+                                            existingOffer?.status == "PENDING" -> "Offer Pending"
+                                            else -> "Make Offer"
+                                        },
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
 
                             if (hasExistingOffer) {

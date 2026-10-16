@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,9 +29,11 @@ import com.google.firebase.auth.FirebaseAuth
 fun BookingDetailScreen(
     requestId: String,
     onNavigateBack: () -> Unit = {},
+    onNavigateToChat: (String) -> Unit = {},
     viewModel: TransportRequestViewModel = viewModel(),
     cargoViewModel: CargoViewModel = viewModel(),
-    truckViewModel: TruckViewModel = viewModel()
+    truckViewModel: TruckViewModel = viewModel(),
+    chatViewModel: ChatViewModel = viewModel()
 ) {
     val requestDetailState by viewModel.requestDetailState.collectAsState()
     val requestActionState by viewModel.requestActionState.collectAsState()
@@ -268,6 +271,30 @@ fun BookingDetailScreen(
                                     )
                                 }
                             }
+                        }
+
+                        // In-App Chat Action Button
+                        Button(
+                            onClick = {
+                                chatViewModel.openConversationByRequest(request) { convId ->
+                                    onNavigateToChat(convId)
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Chat", modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isDriver) "Chat with Cargo Owner" else "Chat with Driver",
+                                fontWeight = FontWeight.Bold
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))

@@ -4,13 +4,12 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -18,8 +17,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination
@@ -86,6 +85,7 @@ fun LoadingScreen(message: String = "Preparing CargoLink…") {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthenticatedNavGraph(
     authViewModel: AuthViewModel,
@@ -97,7 +97,11 @@ fun AuthenticatedNavGraph(
     val profileViewModel: com.example.cargolink.presentation.viewmodel.ProfileViewModel = viewModel()
     val cargoViewModel: com.example.cargolink.presentation.viewmodel.CargoViewModel = viewModel()
     val requestViewModel: com.example.cargolink.presentation.viewmodel.TransportRequestViewModel = viewModel()
+    val chatViewModel: com.example.cargolink.presentation.viewmodel.ChatViewModel = viewModel()
+    val notificationViewModel: com.example.cargolink.presentation.viewmodel.NotificationViewModel = viewModel()
     val profileState by profileViewModel.profileState.collectAsState()
+    val notificationListState by notificationViewModel.notificationListState.collectAsState()
+    val unreadCount = (notificationListState as? com.example.cargolink.presentation.viewmodel.NotificationListState.Success)?.unreadCount ?: 0
 
     val bottomBarScreens = listOf(
         Screen.Home.route,
@@ -140,11 +144,7 @@ fun AuthenticatedNavGraph(
                     participationType = user?.participationType,
                     onFindTruck = { navigateToTopLevel(Screen.Explore.route) },
                     onPostCargo = {
-                        if (user?.participationType == "CARGO_OWNER") {
-                            navigateToTopLevel(Screen.MyListings.route)
-                        } else {
-                            navController.navigate(Screen.TruckAddEdit.createRoute("new"))
-                        }
+                        navController.navigate(Screen.TruckAddEdit.createRoute("new"))
                     },
                     onOfferCapacity = { navController.navigate(Screen.TruckAddEdit.createRoute("new")) },
                     onViewMyListings = {
@@ -158,7 +158,9 @@ fun AuthenticatedNavGraph(
                         navController.navigate(Screen.TruckDetail.createRoute(truckId))
                     },
                     onNavigateToProfile = { navigateToTopLevel(Screen.Profile.route) },
-                    onNavigateToExplore = { navigateToTopLevel(Screen.Explore.route) }
+                    onNavigateToExplore = { navigateToTopLevel(Screen.Explore.route) },
+                    onNavigateToNotifications = { navController.navigate(Screen.Notifications.route) },
+                    unreadCount = unreadCount
                 )
             }
             composable(Screen.Explore.route) {
@@ -172,6 +174,8 @@ fun AuthenticatedNavGraph(
                         }
                     },
                     onNavigateToProfile = { navigateToTopLevel(Screen.Profile.route) },
+                    onNavigateToNotifications = { navController.navigate(Screen.Notifications.route) },
+                    unreadCount = unreadCount,
                     viewModel = truckViewModel,
                     cargoViewModel = cargoViewModel
                 )
@@ -182,7 +186,13 @@ fun AuthenticatedNavGraph(
                     onNavigateToDetails = { id ->
                         navController.navigate(Screen.BookingDetail.createRoute(id))
                     },
-                    viewModel = requestViewModel
+                    onNavigateToChat = { convId ->
+                        navController.navigate(Screen.ChatScreen.createRoute(convId))
+                    },
+                    onNavigateToNotifications = { navController.navigate(Screen.Notifications.route) },
+                    unreadCount = unreadCount,
+                    viewModel = requestViewModel,
+                    chatViewModel = chatViewModel
                 )
             }
             composable(Screen.Profile.route) {
@@ -212,7 +222,16 @@ fun AuthenticatedNavGraph(
                 )
             }
             composable(Screen.MyListings.route) {
-                EmptyShipmentsScreen(onNavigateBack = { navController.popBackStack() })
+                CargoListScreen(
+                    onNavigateToAdd = {
+                        navController.navigate(Screen.TruckAddEdit.createRoute("new"))
+                    },
+                    onNavigateToDetail = { cargoId ->
+                        navController.navigate(Screen.CargoDetail.createRoute(cargoId))
+                    },
+                    onNavigateBack = { navController.popBackStack() },
+                    viewModel = cargoViewModel
+                )
             }
             composable(
                 route = Screen.TruckAddEdit.route,
@@ -235,9 +254,13 @@ fun AuthenticatedNavGraph(
                     truckId = truckId,
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToEdit = { id -> navController.navigate(Screen.TruckAddEdit.createRoute(id)) },
+                    onNavigateToChat = { convId ->
+                        navController.navigate(Screen.ChatScreen.createRoute(convId))
+                    },
                     viewModel = truckViewModel,
                     cargoViewModel = cargoViewModel,
-                    requestViewModel = requestViewModel
+                    requestViewModel = requestViewModel,
+                    chatViewModel = chatViewModel
                 )
             }
             composable(
@@ -249,10 +272,14 @@ fun AuthenticatedNavGraph(
                     cargoId = cargoId,
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToEdit = { id -> navController.navigate(Screen.TruckAddEdit.createRoute(id)) },
+                    onNavigateToChat = { convId ->
+                        navController.navigate(Screen.ChatScreen.createRoute(convId))
+                    },
                     viewModel = cargoViewModel,
                     requestViewModel = requestViewModel,
                     truckViewModel = truckViewModel,
-                    profileViewModel = profileViewModel
+                    profileViewModel = profileViewModel,
+                    chatViewModel = chatViewModel
                 )
             }
             composable(
@@ -263,9 +290,45 @@ fun AuthenticatedNavGraph(
                 BookingDetailScreen(
                     requestId = requestId,
                     onNavigateBack = { navController.popBackStack() },
+                    onNavigateToChat = { convId ->
+                        navController.navigate(Screen.ChatScreen.createRoute(convId))
+                    },
                     viewModel = requestViewModel,
                     cargoViewModel = cargoViewModel,
-                    truckViewModel = truckViewModel
+                    truckViewModel = truckViewModel,
+                    chatViewModel = chatViewModel
+                )
+            }
+            composable(Screen.Conversations.route) {
+                ConversationListScreen(
+                    onNavigateToChat = { convId ->
+                        navController.navigate(Screen.ChatScreen.createRoute(convId))
+                    },
+                    onNavigateBack = { navController.popBackStack() },
+                    viewModel = chatViewModel
+                )
+            }
+            composable(Screen.Notifications.route) {
+                NotificationsScreen(
+                    onNavigateToBookingDetail = { reqId ->
+                        navController.navigate(Screen.BookingDetail.createRoute(reqId))
+                    },
+                    onNavigateToChat = { convId ->
+                        navController.navigate(Screen.ChatScreen.createRoute(convId))
+                    },
+                    onNavigateBack = { navController.popBackStack() },
+                    viewModel = notificationViewModel
+                )
+            }
+            composable(
+                route = Screen.ChatScreen.route,
+                arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val conversationId = backStackEntry.arguments?.getString("conversationId") ?: ""
+                ChatScreen(
+                    conversationId = conversationId,
+                    onNavigateBack = { navController.popBackStack() },
+                    viewModel = chatViewModel
                 )
             }
         }
@@ -319,6 +382,7 @@ fun UnauthenticatedNavGraph(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CargoLinkBottomBar(
     navController: NavHostController, 

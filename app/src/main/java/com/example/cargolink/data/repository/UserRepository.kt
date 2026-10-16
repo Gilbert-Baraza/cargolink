@@ -37,4 +37,8 @@ class UserRepository {
         // Reuse createProfile as Firestore .set() handles updates (merging or overwriting)
         return createProfile(userDto)
     }
+
+    suspend fun getUserMetrics(uid: String, isCargoOwner: Boolean): Pair<Int, Int> {
+        return firestoreDataSource.getUserMetrics(uid, isCargoOwner)
+    }
 }

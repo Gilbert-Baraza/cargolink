@@ -33,6 +33,8 @@ fun ExploreScreen(
     participationType: String? = null,
     onNavigateToDetails: (String) -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
+    unreadCount: Int = 0,
     viewModel: TruckViewModel = viewModel(),
     cargoViewModel: CargoViewModel = viewModel()
 ) {
@@ -64,13 +66,10 @@ fun ExploreScreen(
                     )
                 },
                 actions = {
-                    IconButton(onClick = { /* TODO */ }) {
-                        Icon(
-                            imageVector = Icons.Default.Notifications, 
-                            contentDescription = "Notifications",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+                    NotificationIconButton(
+                        unreadCount = unreadCount,
+                        onClick = onNavigateToNotifications
+                    )
                     Box(
                         modifier = Modifier
                             .padding(end = 16.dp, start = 8.dp)

@@ -33,6 +33,8 @@ fun TruckListScreen(
     viewModel: TruckViewModel = viewModel()
 ) {
     val truckListState by viewModel.truckListState.collectAsState()
+    var selectedFilter by remember { mutableStateOf("ALL") }
+    var showFilterMenu by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.fetchMyTrucks()
@@ -51,11 +53,39 @@ fun TruckListScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* Filter */ }) {
-                        Icon(
-                            imageVector = Icons.Default.FilterList, 
-                            contentDescription = "Filter"
-                        )
+                    Box {
+                        IconButton(onClick = { showFilterMenu = true }) {
+                            Icon(
+                                imageVector = Icons.Default.FilterList, 
+                                contentDescription = "Filter Listings"
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showFilterMenu,
+                            onDismissRequest = { showFilterMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Show All Listings") },
+                                onClick = {
+                                    selectedFilter = "ALL"
+                                    showFilterMenu = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Available Trucks") },
+                                onClick = {
+                                    selectedFilter = "AVAILABLE"
+                                    showFilterMenu = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Inactive / Booked") },
+                                onClick = {
+                                    selectedFilter = "INACTIVE"
+                                    showFilterMenu = false
+                                }
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -82,15 +112,16 @@ fun TruckListScreen(
                 .padding(padding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
+            // Filter Chips Row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilterChip(
-                    selected = true,
-                    onClick = { },
+                    selected = selectedFilter == "ALL",
+                    onClick = { selectedFilter = "ALL" },
                     label = { Text("All Listings") },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -98,18 +129,22 @@ fun TruckListScreen(
                     )
                 )
                 FilterChip(
-                    selected = false,
-                    onClick = { },
-                    label = { Text("Active") },
+                    selected = selectedFilter == "AVAILABLE",
+                    onClick = { selectedFilter = "AVAILABLE" },
+                    label = { Text("Available") },
                     colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
                         labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
                 FilterChip(
-                    selected = false,
-                    onClick = { },
-                    label = { Text("Completed") },
+                    selected = selectedFilter == "INACTIVE",
+                    onClick = { selectedFilter = "INACTIVE" },
+                    label = { Text("Inactive / Booked") },
                     colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
                         labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
@@ -140,15 +175,47 @@ fun TruckListScreen(
                         }
                     }
                     is TruckListState.Success -> {
+                        val filteredTrucks = state.trucks.filter { truck ->
+                            when (selectedFilter) {
+                                "AVAILABLE" -> truck.status.lowercase() == "available"
+                                "INACTIVE" -> truck.status.lowercase() != "available"
+                                else -> true
+                            }
+                        }
+
                         if (state.trucks.isEmpty()) {
                             EmptyState(onNavigateToAdd)
+                        } else if (filteredTrucks.isEmpty()) {
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .padding(32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocalShipping,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(64.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "No $selectedFilter truck listings",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                OutlinedButton(onClick = { selectedFilter = "ALL" }) {
+                                    Text("Clear Filter")
+                                }
+                            }
                         } else {
                             LazyColumn(
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                items(state.trucks) { truck ->
+                                items(filteredTrucks) { truck ->
                                     MyListingItem(
                                         title = truck.registrationNumber,
                                         subtitle = "${truck.truckType} • ${truck.maxPayloadKg} kg",
@@ -247,6 +314,7 @@ fun ListingStatusChip(status: String) {
         "available" -> Color(0xFF4CAF50).copy(alpha = 0.2f) to Color(0xFF4CAF50)
         "pending" -> Color(0xFFFFA000).copy(alpha = 0.2f) to Color(0xFFFFA000)
         "in transit" -> Color(0xFF2196F3).copy(alpha = 0.2f) to Color(0xFF2196F3)
+        "inactive" -> Color(0xFF9E9E9E).copy(alpha = 0.2f) to Color(0xFF616161)
         else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
     }
     

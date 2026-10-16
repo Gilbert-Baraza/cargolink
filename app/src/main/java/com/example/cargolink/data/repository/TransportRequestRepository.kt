@@ -7,14 +7,10 @@ import com.example.cargolink.data.remote.FirestoreDataSource
 class TransportRequestRepository {
     private val firestoreDataSource = FirestoreDataSource()
 
-    suspend fun createTransportRequest(request: TransportRequestDto): Resource<Unit> {
+    suspend fun createTransportRequest(request: TransportRequestDto): Resource<String> {
         return try {
-            val success = firestoreDataSource.createTransportRequest(request)
-            if (success) {
-                Resource.Success(Unit)
-            } else {
-                Resource.Error("Failed to create transport request")
-            }
+            val createdId = firestoreDataSource.createTransportRequest(request)
+            Resource.Success(createdId)
         } catch (e: Exception) {
             Resource.Error(e.localizedMessage ?: "Failed to create transport request")
         }
