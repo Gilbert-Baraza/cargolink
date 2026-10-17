@@ -702,4 +702,27 @@ class FirestoreDataSource {
             false
         }
     }
+
+    suspend fun markAllNotificationsAsRead(recipientUid: String): Boolean {
+        return try {
+            val snapshot = notificationsCollection
+                .whereEqualTo("recipientUid", recipientUid)
+                .whereEqualTo("isRead", false)
+                .get()
+                .await()
+
+            if (snapshot.isEmpty) return true
+
+            val batch = db.batch()
+            for (doc in snapshot.documents) {
+                batch.update(doc.reference, "isRead", true)
+            }
+            batch.commit().await()
+            Log.d(TAG, "Marked all ${snapshot.size()} notifications as read for $recipientUid")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error marking all notifications as read for $recipientUid", e)
+            false
+        }
+    }
 }

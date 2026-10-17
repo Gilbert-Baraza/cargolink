@@ -160,7 +160,9 @@ fun AuthenticatedNavGraph(
                     onNavigateToProfile = { navigateToTopLevel(Screen.Profile.route) },
                     onNavigateToExplore = { navigateToTopLevel(Screen.Explore.route) },
                     onNavigateToNotifications = { navController.navigate(Screen.Notifications.route) },
-                    unreadCount = unreadCount
+                    onNavigateToActivity = { navigateToTopLevel(Screen.Activity.route) },
+                    unreadCount = unreadCount,
+                    requestViewModel = requestViewModel
                 )
             }
             composable(Screen.Explore.route) {

@@ -38,4 +38,13 @@ class NotificationRepository {
             Resource.Error(e.localizedMessage ?: "Failed to mark notification as read")
         }
     }
+
+    suspend fun markAllNotificationsAsRead(recipientUid: String): Resource<Unit> {
+        return try {
+            val success = firestoreDataSource.markAllNotificationsAsRead(recipientUid)
+            if (success) Resource.Success(Unit) else Resource.Error("Failed to mark all notifications as read")
+        } catch (e: Exception) {
+            Resource.Error(e.localizedMessage ?: "Failed to mark all notifications as read")
+        }
+    }
 }

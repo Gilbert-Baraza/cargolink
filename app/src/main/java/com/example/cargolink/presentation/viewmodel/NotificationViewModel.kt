@@ -81,6 +81,7 @@ class NotificationViewModel : ViewModel() {
     }
 
     fun markAllAsRead() {
+        val uid = auth.currentUser?.uid ?: return
         val currentState = _notificationListState.value
         if (currentState is NotificationListState.Success) {
             val unreadNotifs = currentState.notifications.filter { !it.isRead }
@@ -90,9 +91,7 @@ class NotificationViewModel : ViewModel() {
             _notificationListState.value = NotificationListState.Success(updatedList, 0)
 
             viewModelScope.launch {
-                unreadNotifs.forEach { notif ->
-                    notif.id?.let { repository.markNotificationAsRead(it) }
-                }
+                repository.markAllNotificationsAsRead(uid)
             }
         }
     }

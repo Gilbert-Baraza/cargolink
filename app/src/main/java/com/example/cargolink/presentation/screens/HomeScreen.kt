@@ -14,7 +14,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,6 +23,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.cargolink.data.models.TransportRequestDto
+import com.example.cargolink.presentation.viewmodel.RequestListState
+import com.example.cargolink.presentation.viewmodel.TransportRequestViewModel
 import com.example.cargolink.ui.theme.CargoLinkTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,8 +42,21 @@ fun HomeScreen(
     onNavigateToProfile: () -> Unit = {},
     onNavigateToExplore: () -> Unit = {},
     onNavigateToNotifications: () -> Unit = {},
-    unreadCount: Int = 0
+    onNavigateToActivity: () -> Unit = {},
+    unreadCount: Int = 0,
+    requestViewModel: TransportRequestViewModel = viewModel()
 ) {
+    val isDriver = participationType == "TRUCK_DRIVER" || participationType == "TRUCK_OPERATOR"
+    val requestListState by requestViewModel.requestListState.collectAsState()
+
+    LaunchedEffect(isDriver) {
+        if (isDriver) {
+            requestViewModel.fetchTruckOwnerRequests()
+        } else {
+            requestViewModel.fetchCargoOwnerRequests()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -66,7 +83,7 @@ fun HomeScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "JD",
+                            userName.take(2).uppercase(),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -104,12 +121,21 @@ fun HomeScreen(
                     color = MaterialTheme.colorScheme.primary
                 )
             )
-            Text(
-                text = "Find your next load or truck",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            if (isDriver) {
+                Text(
+                    text = "Find your next load",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 )
-            )
+            } else {
+                Text(
+                    text = "Find your next truck",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
+            }
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -174,7 +200,7 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (participationType == "TRUCK_DRIVER" || participationType == "TRUCK_OPERATOR") {
+                if (isDriver) {
                     Surface(
                         onClick = onOfferCapacity,
                         modifier = Modifier.weight(1f),
@@ -224,7 +250,7 @@ fun HomeScreen(
             
             Spacer(modifier = Modifier.height(12.dp))
 
-            if (participationType == "TRUCK_DRIVER") {
+            if (isDriver) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -284,38 +310,158 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Text(
-                text = "Recent Activity",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.Bold, 
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surface)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Empty state for activity on home screen (since no backend exists yet)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
+                Text(
+                    text = "Recent Activity",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold, 
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                )
+                TextButton(onClick = onNavigateToActivity) {
                     Text(
-                        "No recent activity to display.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "View All",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
             
+            Spacer(modifier = Modifier.height(8.dp))
+
+            when (val state = requestListState) {
+                is RequestListState.Loading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+                is RequestListState.Error -> {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = state.message,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                }
+                is RequestListState.Success -> {
+                    val recentList = state.requests.take(3)
+                    if (recentList.isEmpty()) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "No recent activity to display.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            recentList.forEachIndexed { index, request ->
+                                RecentActivityItemRow(
+                                    request = request,
+                                    isDriver = isDriver,
+                                    onClick = { onNavigateToDetails(request.id ?: "") }
+                                )
+                                if (index < recentList.size - 1) {
+                                    HorizontalDivider(
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
             Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
+
+@Composable
+fun RecentActivityItemRow(
+    request: TransportRequestDto,
+    isDriver: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = if (isDriver) "Cargo: ${request.cargoTitle}" else "Truck: ${request.truckTitle}",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "${request.pickupLocation} → ${request.destination}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            request.proposedPrice?.let { price ->
+                if (price > 0) {
+                    Text(
+                        text = "${request.currency} ${"%.0f".format(price)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Column(horizontalAlignment = Alignment.End) {
+            RequestStatusChip(status = request.status, isConfirmed = request.isConfirmedByOwner)
+            Spacer(modifier = Modifier.height(4.dp))
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "Details",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }
@@ -359,36 +505,6 @@ fun StatusChip(text: String, color: Color) {
                 fontWeight = FontWeight.Bold,
                 color = color
             )
-        )
-    }
-}
-
-@Composable
-fun MatchItem(title: String, subtitle: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title, 
-                style = MaterialTheme.typography.bodyMedium, 
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = subtitle, 
-                style = MaterialTheme.typography.bodySmall, 
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Icon(
-            imageVector = Icons.Default.ChevronRight, 
-            contentDescription = null, 
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
         )
     }
 }
