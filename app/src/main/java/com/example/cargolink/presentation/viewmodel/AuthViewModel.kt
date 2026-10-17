@@ -2,10 +2,12 @@ package com.example.cargolink.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.cargolink.core.common.AppErrorMapper
 import com.example.cargolink.core.common.Resource
 import com.example.cargolink.data.models.UserDto
 import com.example.cargolink.data.repository.UserRepository
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,8 +45,7 @@ class AuthViewModel : ViewModel() {
                         _authState.value = AuthState.Authenticated
                     }
                     is Resource.Error -> {
-                        auth.signOut()
-                        _authState.value = AuthState.Unauthenticated
+                        _authState.value = AuthState.ProfileIncomplete(currentUser.uid, currentUser.email)
                     }
                     is Resource.Loading -> {}
                 }
@@ -55,10 +56,18 @@ class AuthViewModel : ViewModel() {
     }
 
     fun login(email: String, pass: String) {
+        val trimmedEmail = email.trim()
+        val trimmedPass = pass.trim()
+
+        if (trimmedEmail.isBlank() || trimmedPass.isBlank()) {
+            _authState.value = AuthState.Error("Please enter your email and password.")
+            return
+        }
+
         viewModelScope.launch {
             _authState.value = AuthState.Loading("Logging in...")
             try {
-                val result = auth.signInWithEmailAndPassword(email, pass).await()
+                val result = auth.signInWithEmailAndPassword(trimmedEmail, trimmedPass).await()
                 val uid = result.user?.uid
                 if (uid != null) {
                     when (val profileResult = userRepository.getProfile(uid)) {
@@ -66,21 +75,15 @@ class AuthViewModel : ViewModel() {
                             _authState.value = AuthState.Authenticated
                         }
                         is Resource.Error -> {
-                            _authState.value = AuthState.Error("Profile not found. Please register an account.")
+                            _authState.value = AuthState.ProfileIncomplete(uid, trimmedEmail)
                         }
                         is Resource.Loading -> {}
                     }
                 } else {
-                    _authState.value = AuthState.Error("Failed to retrieve user ID")
+                    _authState.value = AuthState.Error("Failed to retrieve user credentials.")
                 }
             } catch (e: Exception) {
-                val errorMessage = when (e) {
-                    is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException -> "Invalid email or password. Please check your credentials."
-                    is com.google.firebase.auth.FirebaseAuthInvalidUserException -> "No account found with this email. Please register first."
-                    is com.google.firebase.FirebaseNetworkException -> "Network error. Please check your internet connection and try again."
-                    else -> "Login failed: ${e.localizedMessage}"
-                }
-                _authState.value = AuthState.Error(errorMessage)
+                _authState.value = AuthState.Error(AppErrorMapper.map(e, "Login failed. Please check your credentials."))
             }
         }
     }
@@ -94,31 +97,32 @@ class AuthViewModel : ViewModel() {
         ownerKind: String?,
         companyName: String?
     ) {
+        val trimmedName = name.trim()
+        val trimmedEmail = email.trim()
+        val trimmedPhone = phone.trim()
+        val trimmedRole = participationType.trim()
+        val trimmedCompany = companyName?.trim()
+
         viewModelScope.launch {
             _authState.value = AuthState.Loading("Creating account...")
             try {
-                // If there's an existing user (e.g. from ProfileIncomplete state), don't create new auth
+                // If there's an existing authenticated user whose profile was incomplete
                 val currentUser = auth.currentUser
-                val firebaseUid = if (currentUser != null && currentUser.email == email) {
+                val firebaseUid = if (currentUser != null && currentUser.email == trimmedEmail) {
                     currentUser.uid
                 } else {
-                    val authResult = try {
-                        auth.createUserWithEmailAndPassword(email, pass).await()
-                    } catch (e: com.google.firebase.auth.FirebaseAuthUserCollisionException) {
-                        // Attempt sign in to recover missing profile for existing auth account
-                        auth.signInWithEmailAndPassword(email, pass).await()
-                    }
-                    authResult.user?.uid ?: throw Exception("Failed to get Firebase UID")
+                    val authResult = auth.createUserWithEmailAndPassword(trimmedEmail, pass).await()
+                    authResult.user?.uid ?: throw Exception("Failed to retrieve user ID")
                 }
 
                 val userDto = UserDto(
                     firebaseUid = firebaseUid,
-                    name = name,
-                    email = email,
-                    phone = phone,
-                    participationType = participationType,
+                    name = trimmedName,
+                    email = trimmedEmail,
+                    phone = trimmedPhone,
+                    participationType = trimmedRole,
                     ownerKind = ownerKind,
-                    companyName = companyName,
+                    companyName = trimmedCompany,
                     accountStatus = "ACTIVE",
                     createdAt = System.currentTimeMillis().toString()
                 )
@@ -129,19 +133,56 @@ class AuthViewModel : ViewModel() {
                         _authState.value = AuthState.RegistrationSuccess
                     }
                     is Resource.Error -> {
-                        _authState.value = AuthState.Error("Profile creation failed: ${result.message}. Please check details and try again.")
+                        _authState.value = AuthState.ProfileIncomplete(firebaseUid, trimmedEmail)
                     }
                     is Resource.Loading -> {}
                 }
+            } catch (e: FirebaseAuthUserCollisionException) {
+                _authState.value = AuthState.Error("An account already exists with this email address. Please log in or reset your password.")
             } catch (e: Exception) {
-                val errorMessage = when (e) {
-                    is com.google.firebase.auth.FirebaseAuthUserCollisionException -> "An account already exists with this email address."
-                    is com.google.firebase.auth.FirebaseAuthWeakPasswordException -> "Password is too weak. Please use a stronger password."
-                    is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException -> "Invalid email format."
-                    is com.google.firebase.FirebaseNetworkException -> "Network error. Please check your internet connection and try again."
-                    else -> "Registration failed: ${e.localizedMessage}. Please try again."
+                _authState.value = AuthState.Error(AppErrorMapper.map(e, "Registration failed. Please try again."))
+            }
+        }
+    }
+
+    fun completeProfile(
+        name: String,
+        phone: String,
+        participationType: String,
+        ownerKind: String?,
+        companyName: String?
+    ) {
+        val currentUser = auth.currentUser
+        val uid = currentUser?.uid
+        val email = currentUser?.email ?: ""
+
+        if (uid == null) {
+            _authState.value = AuthState.Error("User session expired. Please log in.")
+            return
+        }
+
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading("Saving profile details...")
+            val userDto = UserDto(
+                firebaseUid = uid,
+                name = name.trim(),
+                email = email.trim(),
+                phone = phone.trim(),
+                participationType = participationType.trim(),
+                ownerKind = ownerKind,
+                companyName = companyName?.trim(),
+                accountStatus = "ACTIVE",
+                createdAt = System.currentTimeMillis().toString()
+            )
+
+            when (val result = userRepository.createProfile(userDto)) {
+                is Resource.Success -> {
+                    _authState.value = AuthState.Authenticated
                 }
-                _authState.value = AuthState.Error(errorMessage)
+                is Resource.Error -> {
+                    _authState.value = AuthState.Error(result.message ?: "Failed to save profile. Please try again.")
+                }
+                is Resource.Loading -> {}
             }
         }
     }

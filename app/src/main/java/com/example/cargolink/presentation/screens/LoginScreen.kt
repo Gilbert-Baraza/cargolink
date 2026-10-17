@@ -24,6 +24,12 @@ fun LoginScreen(
 
     val authState by viewModel.authState.collectAsState()
 
+    LaunchedEffect(Unit) {
+        if (viewModel.authState.value is AuthState.Error) {
+            viewModel.resetState()
+        }
+    }
+
     LaunchedEffect(authState) {
         if (authState is AuthState.Authenticated) {
             onLoginSuccess()
@@ -140,7 +146,10 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             TextButton(
-                onClick = onNavigateBack,
+                onClick = {
+                    viewModel.resetState()
+                    onNavigateBack()
+                },
                 colors = ButtonDefaults.textButtonColors(
                     contentColor = MaterialTheme.colorScheme.primary
                 )

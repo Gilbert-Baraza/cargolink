@@ -2,6 +2,7 @@ package com.example.cargolink.presentation.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,6 +38,12 @@ fun RegistrationScreen(
     var companyNameError by remember { mutableStateOf<String?>(null) }
 
     val authState by viewModel.authState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        if (viewModel.authState.value is AuthState.Error) {
+            viewModel.resetState()
+        }
+    }
 
     LaunchedEffect(authState) {
         if (authState is AuthState.RegistrationSuccess) {
@@ -80,7 +87,7 @@ fun RegistrationScreen(
                 )
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             OutlinedTextField(
                 value = email,
@@ -97,7 +104,7 @@ fun RegistrationScreen(
                 )
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             OutlinedTextField(
                 value = phone,
@@ -114,7 +121,7 @@ fun RegistrationScreen(
                 )
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             OutlinedTextField(
                 value = password,
@@ -132,7 +139,7 @@ fun RegistrationScreen(
                 )
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             OutlinedTextField(
                 value = confirmPassword,
@@ -163,7 +170,7 @@ fun RegistrationScreen(
             ) {
                 FilterChip(
                     selected = participationType == "TRUCK_DRIVER",
-                    onClick = { participationType = "TRUCK_DRIVER" },
+                    onClick = { participationType = "TRUCK_DRIVER"; participationError = null },
                     label = { Text("Truck Driver") },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -173,7 +180,7 @@ fun RegistrationScreen(
                 )
                 FilterChip(
                     selected = participationType == "CARGO_OWNER",
-                    onClick = { participationType = "CARGO_OWNER" },
+                    onClick = { participationType = "CARGO_OWNER"; participationError = null },
                     label = { Text("Cargo Owner") },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -184,7 +191,7 @@ fun RegistrationScreen(
             }
 
             if (participationType == "CARGO_OWNER") {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(
                         selected = ownerKind == "INDIVIDUAL",
@@ -200,7 +207,7 @@ fun RegistrationScreen(
                 }
 
                 if (ownerKind == "COMPANY") {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = companyName,
                         onValueChange = { companyName = it; companyNameError = null },
@@ -222,7 +229,7 @@ fun RegistrationScreen(
                 Text(text = participationError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             if (authState is AuthState.Loading) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -234,6 +241,41 @@ fun RegistrationScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
+            } else if (authState is AuthState.ProfileIncomplete) {
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Account created successfully, but profile setup is incomplete.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                viewModel.completeProfile(
+                                    name = name.trim(),
+                                    phone = phone.trim(),
+                                    participationType = participationType.trim(),
+                                    ownerKind = if (participationType == "CARGO_OWNER") ownerKind else null,
+                                    companyName = if (participationType == "CARGO_OWNER" && ownerKind == "COMPANY") companyName.trim() else null
+                                )
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondary
+                            )
+                        ) {
+                            Text("Complete Profile Setup")
+                        }
+                    }
+                }
             } else {
                 Button(
                     onClick = {
@@ -243,7 +285,7 @@ fun RegistrationScreen(
                         if (email.isBlank()) { 
                             emailError = "Email is required"
                             isValid = false 
-                        } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                        } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) {
                             emailError = "Enter a valid email address"
                             isValid = false
                         }
@@ -252,7 +294,7 @@ fun RegistrationScreen(
                         if (phone.isBlank()) { 
                             phoneError = "Phone number is required"
                             isValid = false 
-                        } else if (!phone.matches(phoneRegex)) {
+                        } else if (!phone.trim().matches(phoneRegex)) {
                             phoneError = "Enter valid format (e.g. +254712345678)"
                             isValid = false
                         }
@@ -305,14 +347,43 @@ fun RegistrationScreen(
             }
 
             if (authState is AuthState.Error) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(text = (authState as AuthState.Error).message, color = MaterialTheme.colorScheme.error)
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = (authState as AuthState.Error).message,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        if ((authState as AuthState.Error).message.contains("already exists")) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            TextButton(
+                                onClick = {
+                                    viewModel.resetState()
+                                    onNavigateBack()
+                                },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                Text("Go to Login →", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             TextButton(
-                onClick = onNavigateBack,
+                onClick = {
+                    viewModel.resetState()
+                    onNavigateBack()
+                },
                 colors = ButtonDefaults.textButtonColors(
                     contentColor = MaterialTheme.colorScheme.primary
                 )
